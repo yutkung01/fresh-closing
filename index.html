@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fresh Closing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://script.google.com">
+<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+  :root {
+    --green: #06c755;
+    --green-dark: #04a547;
+    --green-soft: #e9f9ef;
+    --amber: #b45309;
+    --amber-soft: #fef3c7;
+    --red: #b91c1c;
+    --red-soft: #fee2e2;
+    --ink: #1f2937;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f5f6f7;
+    --card: #ffffff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; }
+  body {
+    font-family: 'Sarabun', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    background: var(--green);
+    color: #fff;
+    padding: 16px 16px 14px;
+  }
+  header .title { font-size: 19px; font-weight: 700; }
+  header .sub { font-size: 14px; opacity: .9; }
+  nav {
+    display: none;
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+  }
+  nav.show { display: flex; }
+  nav button {
+    flex: 1; border: 0; background: none; font: inherit; font-weight: 600;
+    padding: 12px 8px; color: var(--muted); border-bottom: 3px solid transparent;
+  }
+  nav button.active { color: var(--green-dark); border-bottom-color: var(--green); }
+  main { padding: 16px; max-width: 520px; margin: 0 auto; }
+  .card {
+    background: var(--card); border-radius: 14px; padding: 16px;
+    margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.05);
+  }
+  .dept { font-size: 21px; font-weight: 700; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .q { font-weight: 700; margin-bottom: 10px; }
+  .q span { color: var(--green-dark); margin-right: 6px; }
+  .opt {
+    display: block; width: 100%; text-align: left; font: inherit;
+    background: #fff; border: 1.5px solid var(--line); border-radius: 12px;
+    padding: 13px 14px; margin-bottom: 8px; color: var(--ink);
+  }
+  .opt.sel { border-color: var(--green); background: var(--green-soft); font-weight: 600; }
+  .opt.sel.warn { border-color: var(--amber); background: var(--amber-soft); }
+  .opt.sel.bad { border-color: var(--red); background: var(--red-soft); }
+  .field { margin-top: 6px; }
+  .field label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  .field input, .field textarea {
+    width: 100%; font: inherit; border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 12px; background: #fff; color: var(--ink);
+  }
+  .field input:focus, .field textarea:focus { outline: none; border-color: var(--green); }
+  .amt { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+  .amt label { font-weight: 600; }
+  .amt .plus label { color: var(--green-dark); }
+  .amt .minus label { color: var(--red); }
+  .net { margin-top: 10px; font-size: 15px; display: flex; justify-content: space-between; }
+  .pos { color: var(--green-dark); }
+  .neg { color: var(--red); }
+  .alert { border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 8px; }
+  .alert.warn { background: var(--amber-soft); color: var(--amber); }
+  .alert.bad { background: var(--red-soft); color: var(--red); }
+  .btn {
+    display: block; width: 100%; border: 0; border-radius: 12px; font: inherit;
+    font-weight: 700; padding: 15px; background: var(--green); color: #fff; font-size: 17px;
+  }
+  .btn:disabled { background: #c7cdd4; }
+  .btn.ghost { background: #fff; color: var(--green-dark); border: 1.5px solid var(--green); margin-top: 10px; }
+  .done-icon {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--green-soft);
+    color: var(--green-dark); display: grid; place-items: center; font-size: 30px; margin: 4px auto 10px;
+  }
+  .center { text-align: center; }
+  .rows { margin-top: 12px; border-top: 1px solid var(--line); }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+  .row b { text-align: right; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 14px; }
+  .stat .n { font-size: 24px; font-weight: 700; }
+  .dl { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .dl:last-child { border-bottom: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; flex: none; }
+  .dot.ok { background: var(--green); }
+  .dot.issue { background: var(--amber); }
+  .dl .grow { flex: 1; min-width: 0; }
+  .dl .name { font-weight: 600; }
+  .tag { font-size: 13px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .tag.ok { background: var(--green-soft); color: var(--green-dark); }
+  .tag.issue { background: var(--amber-soft); color: var(--amber); }
+  .tag.wait { background: #f3f4f6; color: var(--muted); }
+  .spinner {
+    width: 34px; height: 34px; border: 3px solid var(--line); border-top-color: var(--green);
+    border-radius: 50%; animation: spin .8s linear infinite; margin: 40px auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ph-h { font-weight: 600; margin: 14px 0 6px; }
+  .pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ph { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #f3f4f6; }
+  .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ph .rm { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0;
+    background: rgba(0,0,0,.6); color: #fff; font-size: 14px; line-height: 26px; padding: 0; }
+  .addph { aspect-ratio: 1; border: 1.5px dashed #c7cdd4; border-radius: 10px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--green-dark); font-size: 26px; cursor: pointer; }
+  .addph span { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .datenav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+  .datenav button { flex: none; width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line);
+    background: #fff; font-size: 20px; color: var(--ink); }
+  .datenav button:disabled { color: #c7cdd4; }
+  .datenav input { flex: 1; min-width: 0; height: 44px; border: 1.5px solid var(--line); border-radius: 10px;
+    padding: 0 10px; font: inherit; background: #fff; color: var(--ink); }
+  .dl.click { cursor: pointer; }
+  .dl .chev { color: #c7cdd4; font-size: 18px; flex: none; }
+  .back { border: 0; background: none; font: inherit; color: var(--green-dark); font-weight: 600; padding: 4px 0 12px; }
+  .hist { border-left: 2px solid var(--line); margin-left: 6px; padding-left: 14px; }
+  .hist .it { position: relative; padding: 6px 0 10px; font-size: 14px; }
+  .hist .it::before { content: ''; position: absolute; left: -21px; top: 11px; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--green); }
+  .hist .it.edit::before { background: var(--amber); }
+  .zoom { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center;
+    z-index: 10; padding: 16px; }
+  .zoom img { max-width: 100%; max-height: 100%; border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="title">Fresh Daily Closing</div>
+  <div class="sub" id="hdr-sub">ตรวจวันหมดอายุ · ปรับสต็อก</div>
+</header>
+<nav id="tabs">
+  <button data-tab="close" class="active">ปิดงานแผนก</button>
+  <button data-tab="dash">ภาพรวม 6 แผนก</button>
+</nav>
+<main id="view"></main>
+
+<script>
+/* ===== ตั้งค่า: ใส่ 2 ค่านี้ก่อนใช้งาน ===== */
+const CONFIG = {
+  LIFF_ID: '2012008671-IRlnuTJp',
+  API_URL: 'https://script.google.com/macros/s/AKfycbx5gq9V71iqmPd2kXq2UyxRQ-MOWiSG8k0eEoorCBgbqMvXFIvqUgn6l-_vi7vJoQiD/exec',
+};
+/* ========================================== */
+
+const view = document.getElementById('view');
+const tabs = document.getElementById('tabs');
+const state = {
+  me: null,
+  tab: 'close',
+  editing: false,
+  submitting: false,
+  form: { expiryStatus: '', stockAdjusted: null, stockPlus: '', stockMinus: '', note: '', photos: [] },
+  existingPhotos: 0,   // จำนวนรูปเดิม (ตอนแก้ไข)
+  preparing: false,    // กำลังย่อรูป
+  dashDate: null,      // วันที่ที่ Manager เลือกดู (null = วันนี้)
+  detail: null,        // { date, department } เมื่อเปิดหน้ารายละเอียด
+};
+const MAX_PHOTOS = 3;
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const baht = n => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
+const num = v => Number(String(v || '').replace(/,/g, '')) || 0;
+const signed = n => n > 0 ? `<span class="pos">+฿${baht(n)}</span>` : n < 0 ? `<span class="neg">−฿${baht(-n)}</span>` : '฿0';
+const stockText = c => (c.stockPlus || c.stockMinus)
+  ? [c.stockPlus ? `<span class="pos">+฿${baht(c.stockPlus)}</span>` : '', c.stockMinus ? `<span class="neg">−฿${baht(c.stockMinus)}</span>` : ''].filter(Boolean).join(' / ')
+  : 'ไม่ปรับสต็อก';
+const thaiDate = iso => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+};
+
+function loading(msg) {
+  view.innerHTML = `<div class="spinner"></div><p class="center muted">${esc(msg || 'กำลังโหลด...')}</p>`;
+}
+
+function showError(msg) {
+  view.innerHTML = `
+    <div class="card center">
+      <div class="done-icon" style="background:var(--red-soft);color:var(--red)">!</div>
+      <p>${esc(msg)}</p>
+      <button class="btn" id="retry">ลองใหม่</button>
+    </div>`;
+  document.getElementById('retry').onclick = () => location.reload();
+}
+
+async function api(action, payload) {
+  const idToken = liff.getIDToken();
+  const res = await fetch(CONFIG.API_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, idToken, payload }), // text/plain → ไม่ติด CORS preflight
+  });
+  const json = await res.json();
+  if (!json.ok) {
+    if (json.code === 'TOKEN_INVALID' && !liff.isInClient()) {
+      liff.login({ redirectUri: location.href });
+    }
+    const err = new Error(json.message || 'เกิดข้อผิดพลาด');
+    err.code = json.code;
+    throw err;
+  }
+  return json.data;
+}
+
+/* ---------- Tabs ---------- */
+tabs.addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]');
+  if (!b) return;
+  state.tab = b.dataset.tab;
+  state.detail = null;
+  [...tabs.children].forEach(x => x.classList.toggle('active', x === b));
+  render();
+});
+
+function render() {
+  const me = state.me;
+  if (!me.registered) return renderPending();
+  if (state.detail) return renderDetail();
+  if (me.role === 'manager' || state.tab === 'dash') return renderDashboard();
+  if (me.closing && !state.editing) return renderDone();
+  return renderForm();
+}
+
+/* ---------- ยังไม่ได้รับสิทธิ์ ---------- */
+function renderPending() {
+  tabs.classList.remove('show');
+  const inactive = state.me.reason === 'inactive';
+  view.innerHTML = `
+    <div class="card center">
+      <div class="done-icon">${inactive ? '–' : '⏳'}</div>
+      <div class="dept">${inactive ? 'บัญชีถูกปิดการใช้งาน' : 'ลงทะเบียนเรียบร้อย'}</div>
+      <p class="muted">คุณ ${esc(state.me.name)}<br>
+      ${inactive ? 'กรุณาติดต่อผู้ดูแลระบบ' : 'รอผู้ดูแลกำหนดแผนกให้ แล้วเปิดลิงก์นี้อีกครั้ง'}</p>
+    </div>`;
+}
+
+/* ---------- ฟอร์มปิดงาน ---------- */
+function renderForm() {
+  const f = state.form;
+  const me = state.me;
+  const opt = (group, value, label, cls = '') =>
+    `<button class="opt ${f[group] === value ? 'sel ' + cls : ''}" data-g="${group}" data-v="${String(value)}">${label}</button>`;
+
+  const canSubmit = formValid();
+  const usingOld = state.editing && state.existingPhotos > 0 && !f.photos.length;
+
+  view.innerHTML = `
+    <div class="card">
+      <div class="muted">${esc(thaiDate(me.businessDate))}</div>
+      <div class="dept">แผนก${esc(me.department)}</div>
+      <div class="muted">ผู้ปิดงาน: ${esc(me.name)}${state.editing ? ' · <b style="color:var(--amber)">กำลังแก้ไข</b>' : ''}</div>
+    </div>
+
+    <div class="card">
+      <div class="q"><span>01</span>ตรวจสอบวันหมดอายุ</div>
+      ${opt('expiryStatus', 'ok', '✅ ตรวจแล้ว ไม่พบปัญหา')}
+      ${opt('expiryStatus', 'issue', '⚠️ ตรวจแล้ว พบสินค้ามีปัญหา', 'warn')}
+      ${opt('expiryStatus', 'notdone', '⏳ ยังตรวจไม่เสร็จ', 'bad')}
+      ${f.expiryStatus === 'notdone' ? `<div class="alert bad">ต้องตรวจให้เสร็จก่อนจึงจะปิดงานได้</div>` : ''}
+      ${f.expiryStatus === 'issue' ? `
+        <div class="field">
+          <label>ระบุสั้นๆ (ไม่บังคับ)</label>
+          <textarea id="note" rows="2" maxlength="300" placeholder="เช่น นมจืด 3 กล่อง เก็บออกแล้ว">${esc(f.note)}</textarea>
+        </div>` : ''}
+    </div>
+
+    <div class="card">
+      <div class="q"><span>02</span>การปรับสต็อก</div>
+      ${opt('stockAdjusted', false, 'ไม่มีการปรับสต็อก')}
+      ${opt('stockAdjusted', true, 'มีการปรับสต็อก')}
+      ${f.stockAdjusted === true ? `
+        <div class="amt">
+          <div class="field plus">
+            <label>ปรับเพิ่ม (+) บาท</label>
+            <input id="plus" inputmode="decimal" placeholder="0" value="${esc(f.stockPlus)}">
+          </div>
+          <div class="field minus">
+            <label>ปรับลด (−) บาท</label>
+            <input id="minus" inputmode="decimal" placeholder="0" value="${esc(f.stockMinus)}">
+          </div>
+        </div>
+        <div class="net muted"><span>ยอดสุทธิ</span><b id="net">${signed(num(f.stockPlus) - num(f.stockMinus))}</b></div>
+        <div class="muted" style="font-size:13px;margin-top:4px">กรอกช่องที่มี ช่องที่ไม่มีเว้นว่างได้</div>
+        <div class="ph-h">📷 รูปหลักฐานการปรับสต็อก <span class="muted" style="font-weight:400">(อย่างน้อย 1 รูป สูงสุด ${MAX_PHOTOS})</span></div>
+        ${usingOld ? `<div class="muted" style="font-size:13px;margin-bottom:6px">ใช้รูปเดิม ${state.existingPhotos} รูป · ถ้าเลือกรูปใหม่ จะแทนที่รูปเดิมทั้งหมด</div>` : ''}
+        <div class="pgrid">
+          ${f.photos.map((u, i) => `<div class="ph"><img src="${u}" alt="รูปที่ ${i + 1}"><button class="rm" data-rm="${i}" aria-label="ลบรูป">✕</button></div>`).join('')}
+          ${f.photos.length < MAX_PHOTOS ? `
+            <label class="addph">${state.preparing ? '<div class="spinner" style="margin:0;width:24px;height:24px"></div><span>กำลังเตรียมรูป</span>' : '＋<span>ถ่าย / เลือกรูป</span>'}
+              <input type="file" accept="image/*" multiple id="pick" hidden ${state.preparing ? 'disabled' : ''}>
+            </label>` : ''}
+        </div>
+        ${!f.photos.length && !usingOld ? `<div class="alert warn" style="margin-top:8px">ต้องแนบรูปก่อนจึงจะยืนยันได้</div>` : ''}` : ''}
+    </div>
+
+    <button class="btn" id="submit" ${canSubmit ? '' : 'disabled'}>
+      ${state.submitting ? (f.stockAdjusted && f.photos.length ? 'กำลังอัปโหลดรูปและบันทึก...' : 'กำลังบันทึก...') : state.editing ? 'บันทึกการแก้ไข' : 'ยืนยันปิดงาน'}
+    </button>
+    ${state.editing ? `<button class="btn ghost" id="cancel">ยกเลิกการแก้ไข</button>` : ''}
+  `;
+
+  view.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+    const g = b.dataset.g;
+    let v = b.dataset.v;
+    if (g === 'stockAdjusted') v = v === 'true';
+    f[g] = v;
+    renderForm();
+    if (g === 'stockAdjusted' && v === true) document.getElementById('minus')?.focus();
+  });
+
+  ['plus', 'minus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.oninput = () => {
+      const key = id === 'plus' ? 'stockPlus' : 'stockMinus';
+      el.value = el.value.replace(/[^\d.,]/g, '');
+      f[key] = el.value;
+      document.getElementById('net').innerHTML = signed(num(f.stockPlus) - num(f.stockMinus));
+      document.getElementById('submit').disabled = !formValid();
+    };
+  });
+
+  const note = document.getElementById('note');
+  if (note) note.oninput = () => { f.note = note.value; };
+
+  const pick = document.getElementById('pick');
+  if (pick) pick.onchange = () => { addPhotos(pick.files); pick.value = ''; };
+  view.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
+    f.photos.splice(Number(b.dataset.rm), 1);
+    renderForm();
+  });
+
+  document.getElementById('submit').onclick = submit;
+  const cancel = document.getElementById('cancel');
+  if (cancel) cancel.onclick = () => { state.editing = false; render(); };
+}
+
+function formValid() {
+  const f = state.form;
+  if (!['ok', 'issue'].includes(f.expiryStatus) || f.stockAdjusted === null) return false;
+  if (state.submitting || state.preparing) return false;
+  if (f.stockAdjusted) {
+    if (num(f.stockPlus) + num(f.stockMinus) <= 0) return false;
+    if (!f.photos.length && !(state.editing && state.existingPhotos > 0)) return false;
+  }
+  return true;
+}
+
+/** ย่อรูปบนมือถือก่อนส่ง (ด้านยาวสุด 1280px, JPEG) ให้อัปโหลดเร็วและไม่เปลืองพื้นที่ */
+async function compressImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('เปิดไฟล์รูปนี้ไม่ได้'));
+      i.src = url;
+    });
+    const k = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k);
+    c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.72);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function addPhotos(files) {
+  const f = state.form;
+  const room = MAX_PHOTOS - f.photos.length;
+  const list = [...files].filter(x => x.type.startsWith('image/') || !x.type).slice(0, room);
+  if (files.length > room) alert(`แนบได้สูงสุด ${MAX_PHOTOS} รูป`);
+  if (!list.length) return;
+  state.preparing = true;
+  renderForm();
+  try {
+    for (const file of list) f.photos.push(await compressImage(file));
+  } catch (e) {
+    alert(e.message);
+  } finally {
+    state.preparing = false;
+    renderForm();
+  }
+}
+
+async function submit() {
+  const f = state.form;
+  state.submitting = true;
+  renderForm();
+  try {
+    const data = await api('submit', {
+      expiryStatus: f.expiryStatus,
+      stockAdjusted: f.stockAdjusted,
+      stockPlus: f.stockAdjusted ? f.stockPlus : '',
+      stockMinus: f.stockAdjusted ? f.stockMinus : '',
+      note: f.expiryStatus === 'issue' ? f.note : '',
+      photos: f.stockAdjusted ? f.photos : [],
+      keepPhotos: !!(f.stockAdjusted && !f.photos.length && state.editing && state.existingPhotos > 0),
+    });
+    state.me.closing = data.closing;
+    state.editing = false;
+    state.submitting = false;
+    state.notify = 'sending';
+    render(); // แสดงผลทันที แล้วค่อยส่งแจ้งเตือนตามหลัง
+    state.notify = await notifyGroup(data);
+    if (state.me.closing === data.closing && !state.editing && state.tab === 'close') render();
+  } catch (e) {
+    state.submitting = false;
+    alert(e.message);
+    render();
+  }
+}
+
+/* ---------- แจ้งเตือนเข้ากลุ่ม (ส่งในนามผู้ปิดงาน ไม่กินโควตา OA) ---------- */
+function groupMessage(data) {
+  const c = data.closing;
+  const p = data.progress;
+  const plain = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const issue = c.status === 'เสร็จ (พบปัญหา)';
+  const lines = [
+    `${data.edited ? '✏️ แก้ไขผลปิดงาน' : issue ? '⚠️ ปิดงาน' : '✅ ปิดงาน'}แผนก${c.department}แล้ว`,
+    `👤 ${c.name} · ${data.edited ? c.updatedAt : c.submittedAt} น.`,
+  ];
+  if (issue) lines.push(`⚠️ พบสินค้ามีปัญหา${c.note ? ': ' + c.note : ''}`);
+  const stock = [];
+  if (c.stockPlus) stock.push(`+฿${plain(c.stockPlus)}`);
+  if (c.stockMinus) stock.push(`−฿${plain(c.stockMinus)}`);
+  lines.push(`📦 ปรับสต็อก: ${stock.length ? stock.join(' / ') : 'ไม่มี'}`);
+  if (c.photoCount) lines.push(`📷 แนบรูปหลักฐาน ${c.photoCount} รูป`);
+  lines.push('━━━━━━━━━━');
+  if (!p.pending.length) {
+    lines.push(`🎉 ปิดครบ ${p.doneCount}/${p.totalDepartments} แผนกแล้ว`);
+  } else {
+    lines.push(`ปิดแล้ว ${p.doneCount}/${p.totalDepartments}`);
+    lines.push(`✅ ${p.done.join(', ')}`);
+    lines.push(`⏳ ยังไม่ปิด: ${p.pending.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+async function notifyGroup(data) {
+  try {
+    if (!data.progress || !liff.isInClient()) return 'skip';
+    const ctx = liff.getContext();
+    if (!ctx || !['group', 'room'].includes(ctx.type)) return 'skip';
+    await liff.sendMessages([{ type: 'text', text: groupMessage(data) }]);
+    return 'sent';
+  } catch (e) {
+    console.warn('sendMessages failed', e);
+    return 'fail';
+  }
+}
+
+/* ---------- ปิดงานแล้ว ---------- */
+function renderDone() {
+  const c = state.me.closing;
+  const issue = c.status === 'เสร็จ (พบปัญหา)';
+  view.innerHTML = `
+    <div class="card center">
+      <div class="done-icon" ${issue ? 'style="background:var(--amber-soft);color:var(--amber)"' : ''}>${issue ? '!' : '✓'}</div>
+      <div class="dept">ปิดงานแผนก${esc(c.department)}แล้ว</div>
+      <div class="muted">${esc(thaiDate(state.me.businessDate))}</div>
+      <div class="rows" style="text-align:left">
+        <div class="row"><span>สถานะ</span><b>${esc(c.status)}</b></div>
+        <div class="row"><span>วันหมดอายุ</span><b>${esc(c.expiryStatus)}</b></div>
+        ${c.note ? `<div class="row"><span>หมายเหตุ</span><b>${esc(c.note)}</b></div>` : ''}
+        ${c.stockPlus || c.stockMinus ? `
+        <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
+        <div class="row"><span>ปรับลด (−)</span><b class="neg">−฿${baht(c.stockMinus)}</b></div>
+        <div class="row"><span>ยอดสุทธิ</span><b>${signed(c.stockNet)}</b></div>` :
+        `<div class="row"><span>ปรับสต็อก</span><b>ไม่มีการปรับ</b></div>`}
+        ${c.photoCount ? `<div class="row"><span>รูปหลักฐาน</span><b>📷 ${c.photoCount} รูป</b></div>` : ''}
+        <div class="row"><span>ผู้ปิดงาน</span><b>${esc(c.name)}</b></div>
+        <div class="row"><span>เวลา</span><b>${esc(c.submittedAt)} น.${c.editCount ? ` · แก้ไข ${c.editCount} ครั้ง (ล่าสุด ${esc(c.updatedAt)})` : ''}</b></div>
+      </div>
+    </div>
+    ${state.notify === 'sending' ? `<div class="alert" style="background:#f3f4f6;color:var(--muted);margin:-4px 0 12px">กำลังส่งแจ้งเตือนเข้ากลุ่ม...</div>` : ''}
+    ${state.notify === 'sent' ? `<div class="alert" style="background:var(--green-soft);color:var(--green-dark);margin:-4px 0 12px">📣 ส่งแจ้งเตือนเข้ากลุ่มแล้ว</div>` : ''}
+    ${state.notify === 'skip' ? `<div class="alert warn" style="margin:-4px 0 12px">ไม่ได้ส่งแจ้งเตือนเข้ากลุ่ม เพราะไม่ได้เปิดลิงก์จากในกลุ่ม Fresh</div>` : ''}
+    ${state.notify === 'fail' ? `<div class="alert warn" style="margin:-4px 0 12px">บันทึกสำเร็จ แต่ส่งแจ้งเตือนเข้ากลุ่มไม่ได้</div>` : ''}
+    ${liff.isInClient() ? `<button class="btn" id="close">กลับไปที่ LINE กลุ่ม</button>` : ''}
+    <button class="btn ghost" id="edit">แก้ไขข้อมูล</button>
+    <button class="btn ghost" id="view-detail">ดูรายละเอียด รูป และประวัติแก้ไข</button>
+  `;
+  document.getElementById('view-detail').onclick = () => openDetail(state.me.businessDate, c.department);
+  const close = document.getElementById('close');
+  if (close) close.onclick = () => liff.closeWindow();
+  document.getElementById('edit').onclick = () => {
+    state.form = {
+      expiryStatus: c.expiryStatus === 'ตรวจแล้ว พบสินค้ามีปัญหา' ? 'issue' : 'ok',
+      stockAdjusted: c.stockPlus > 0 || c.stockMinus > 0,
+      stockPlus: c.stockPlus > 0 ? String(c.stockPlus) : '',
+      stockMinus: c.stockMinus > 0 ? String(c.stockMinus) : '',
+      note: c.note || '',
+      photos: [],
+    };
+    state.existingPhotos = c.photoCount || 0;
+    state.editing = true;
+    renderForm();
+  };
+}
+
+/* ---------- ภาพรวม 6 แผนก ---------- */
+const isoAdd = (iso, days) => {
+  const t = new Date(iso + 'T12:00:00Z');
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+};
+
+async function renderDashboard() {
+  loading('กำลังโหลดภาพรวม...');
+  const isManager = state.me.role === 'manager';
+  try {
+    const d = await api('dashboard', state.dashDate ? { date: state.dashDate } : {});
+    if (state.detail || (state.tab !== 'dash' && !isManager)) return;
+    const past = d.businessDate !== d.today;
+    const canOpen = x => isManager || x.department === state.me.department;
+    const pending = d.departments.filter(x => !x.done).map(x => x.department);
+    view.innerHTML = `
+      ${isManager ? `
+      <div class="datenav">
+        <button id="prev" aria-label="วันก่อนหน้า">‹</button>
+        <input type="date" id="dpick" value="${d.businessDate}" max="${d.today}">
+        <button id="next" aria-label="วันถัดไป" ${past ? '' : 'disabled'}>›</button>
+      </div>` : ''}
+      <div class="muted" style="margin-bottom:10px">${esc(thaiDate(d.businessDate))}${past ? ' · <b style="color:var(--amber)">ข้อมูลย้อนหลัง</b>' : ''}</div>
+      <div class="stats">
+        <div class="stat"><div class="muted">ปิดงานแล้ว</div><div class="n">${d.doneCount}/${d.totalDepartments}</div></div>
+        <div class="stat"><div class="muted">ปรับสต็อกสุทธิ${past ? '' : 'วันนี้'}</div><div class="n">${signed(d.totalNet)}</div></div>
+      </div>
+      <div class="card" style="display:flex;justify-content:space-between;padding:12px 16px;font-size:15px">
+        <span>ปรับเพิ่ม <b class="pos">+฿${baht(d.totalPlus)}</b></span>
+        <span>ปรับลด <b class="neg">−฿${baht(d.totalMinus)}</b></span>
+      </div>
+      <div class="card" style="padding:4px 16px">
+        ${d.departments.map(x => {
+          const issue = x.status === 'เสร็จ (พบปัญหา)';
+          const cls = !x.done ? '' : issue ? 'issue' : 'ok';
+          const open = x.done && canOpen(x);
+          return `
+            <div class="dl ${open ? 'click' : ''}" ${open ? `data-dept="${esc(x.department)}"` : ''}>
+              <div class="dot ${cls}"></div>
+              <div class="grow">
+                <div class="name">${esc(x.department)}</div>
+                <div class="muted">${x.done
+                  ? `${esc(x.name)} · ${esc(x.submittedAt)} น. · ${stockText(x)}${x.photoCount ? ' · 📷' + x.photoCount : ''}${x.editCount ? ' · แก้ไข ' + x.editCount + ' ครั้ง' : ''}${x.note ? ' · ' + esc(x.note) : ''}`
+                  : 'ยังไม่ปิดงาน'}</div>
+              </div>
+              <span class="tag ${x.done ? cls : 'wait'}">${!x.done ? 'รอ' : issue ? 'พบปัญหา' : 'เสร็จ'}</span>
+              ${open ? '<span class="chev">›</span>' : ''}
+            </div>`;
+        }).join('')}
+      </div>
+      ${d.mtd ? `
+      <div class="card">
+        <div class="q" style="margin-bottom:6px">📅 สะสม${past ? 'ถึงวันที่เลือก' : 'เดือนนี้'} (1–${d.mtd.toDay})</div>
+        <div class="row"><span>ปรับเพิ่ม</span><b class="pos">+฿${baht(d.mtd.plus)}</b></div>
+        <div class="row"><span>ปรับลด</span><b class="neg">−฿${baht(d.mtd.minus)}</b></div>
+        <div class="row" style="border-bottom:0"><span><b>สุทธิ MTD</b></span><b>${signed(d.mtd.net)}</b></div>
+        <div class="rows">
+          ${d.mtd.departments.map(x => `<div class="row"><span>${esc(x.department)}</span><b>${signed(x.net)}</b></div>`).join('')}
+        </div>
+      </div>` : ''}
+      ${pending.length ? `<div class="alert warn">${past ? 'ไม่ได้ปิดงาน' : 'รอปิดงาน'}: ${pending.map(esc).join(', ')}</div>` : `<div class="alert" style="background:var(--green-soft);color:var(--green-dark)">ปิดงานครบทุกแผนกแล้ว</div>`}
+      ${isManager ? `<div class="muted" style="font-size:13px;margin-top:8px">กดที่แผนกเพื่อดูรายละเอียด รูปหลักฐาน และประวัติแก้ไข</div>` : ''}
+      ${past ? `<button class="btn" id="today" style="margin-top:12px">กลับไปวันนี้</button>` : ''}
+      <button class="btn ghost" id="refresh">รีเฟรช</button>
+    `;
+    document.getElementById('refresh').onclick = renderDashboard;
+    view.querySelectorAll('.dl.click').forEach(el => el.onclick = () => openDetail(d.businessDate, el.dataset.dept));
+    if (isManager) {
+      const go = date => { state.dashDate = date >= d.today ? null : date; renderDashboard(); };
+      document.getElementById('prev').onclick = () => go(isoAdd(d.businessDate, -1));
+      document.getElementById('next').onclick = () => go(isoAdd(d.businessDate, 1));
+      document.getElementById('dpick').onchange = e => { if (e.target.value) go(e.target.value); };
+      const t = document.getElementById('today');
+      if (t) t.onclick = () => go(d.today);
+    }
+  } catch (e) {
+    showError(e.message);
+  }
+}
+
+/* ---------- รายละเอียดแผนก: รูปหลักฐาน + ประวัติแก้ไข ---------- */
+function openDetail(date, department) {
+  state.detail = { date, department };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function closeDetail() {
+  state.detail = null;
+  render();
+}
+
+function zoom(src) {
+  const z = document.createElement('div');
+  z.className = 'zoom';
+  z.innerHTML = `<img src="${src}" alt="รูปหลักฐาน">`;
+  z.onclick = () => z.remove();
+  document.body.appendChild(z);
+}
+
+async function renderDetail() {
+  const want = state.detail;
+  loading('กำลังโหลดรายละเอียดและรูป...');
+  try {
+    const d = await api('detail', want);
+    if (state.detail !== want) return;
+    const c = d.closing;
+    const issue = c && c.status === 'เสร็จ (พบปัญหา)';
+    view.innerHTML = `
+      <button class="back" id="back">‹ กลับ</button>
+      <div class="card">
+        <div class="muted">${esc(thaiDate(d.date))}</div>
+        <div class="dept">แผนก${esc(d.department)}</div>
+        ${c ? `<span class="tag ${issue ? 'issue' : 'ok'}">${esc(c.status)}</span>` : '<span class="tag wait">ยังไม่ปิดงาน</span>'}
+        ${c ? `
+        <div class="rows">
+          <div class="row"><span>วันหมดอายุ</span><b>${esc(c.expiryStatus)}</b></div>
+          ${c.note ? `<div class="row"><span>หมายเหตุ</span><b>${esc(c.note)}</b></div>` : ''}
+          <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
+          <div class="row"><span>ปรับลด (−)</span><b class="neg">−฿${baht(c.stockMinus)}</b></div>
+          <div class="row"><span>ยอดสุทธิ</span><b>${signed(c.stockNet)}</b></div>
+          <div class="row"><span>ผู้ปิดงาน</span><b>${esc(c.name)}</b></div>
+          <div class="row" style="border-bottom:0"><span>เวลา</span><b>${esc(c.submittedAt)} น.${c.editCount ? ` · แก้ไขล่าสุด ${esc(c.updatedAt)} น.` : ''}</b></div>
+        </div>` : ''}
+      </div>
+      ${c && (c.stockPlus || c.stockMinus) ? `
+      <div class="card">
+        <div class="q">📷 รูปหลักฐานการปรับสต็อก</div>
+        ${d.photos.length
+          ? `<div class="pgrid">${d.photos.map((u, i) => `<div class="ph"><img src="${u}" alt="รูปที่ ${i + 1}" data-zoom="${i}"></div>`).join('')}</div>
+             <div class="muted" style="font-size:13px;margin-top:6px">แตะที่รูปเพื่อดูขนาดเต็ม</div>`
+          : `<div class="muted">ไม่มีรูปแนบ${c.photoCount ? ' (เปิดรูปไม่ได้ อาจถูกลบออกจาก Drive)' : ''}</div>`}
+      </div>` : ''}
+      ${d.history.length ? `
+      <div class="card">
+        <div class="q">🕘 ประวัติการบันทึก</div>
+        <div class="hist">
+          ${d.history.map(h => `
+            <div class="it ${h.action === 'edit' ? 'edit' : ''}">
+              <b>${esc(h.time)} น. · ${h.action === 'edit' ? 'แก้ไข' : 'ปิดงาน'}</b> <span class="muted">โดย ${esc(h.name)}</span>
+              <div class="muted">${esc(h.expiryStatus)}${h.note ? ' · ' + esc(h.note) : ''}</div>
+              <div class="muted">${stockText(h)}${h.photoCount ? ' · 📷' + h.photoCount : ''}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+    `;
+    document.getElementById('back').onclick = closeDetail;
+    view.querySelectorAll('[data-zoom]').forEach(img => img.onclick = () => zoom(img.src));
+  } catch (e) {
+    view.innerHTML = `<button class="back" id="back">‹ กลับ</button><div class="card center"><p>${esc(e.message)}</p></div>`;
+    document.getElementById('back').onclick = closeDetail;
+  }
+}
+
+/* ---------- เริ่มต้น ---------- */
+(async function init() {
+  loading('กำลังเชื่อมต่อ LINE...');
+  try {
+    await liff.init({ liffId: CONFIG.LIFF_ID });
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: location.href });
+      return;
+    }
+    loading('กำลังโหลดข้อมูล...');
+    state.me = await api('me');
+    if (state.me.registered && state.me.role === 'supervisor') {
+      tabs.classList.add('show');
+    }
+    if (state.me.registered) {
+      document.getElementById('hdr-sub').textContent =
+        state.me.role === 'manager' ? 'ภาพรวมสำหรับผู้จัดการ' : 'ตรวจวันหมดอายุ · ปรับสต็อก';
+    }
+    render();
+  } catch (e) {
+    console.error(e);
+    showError(e.message || 'เปิดระบบไม่สำเร็จ');
+  }
+})();
+</script>
+</body>
+</html>
