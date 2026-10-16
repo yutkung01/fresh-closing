@@ -188,7 +188,7 @@ const MAX_LINES = 6;
 const REASONS = [
   ['neg_oh', 'ปรับ Negative On Hand', 'Negative OH'],
   ['not_found', 'สินค้าค้าง มี OH แต่หาของไม่เจอ', 'หาของไม่เจอ'],
-  ['cycle', 'ปรับจากการสุ่มนับสต็อก', 'สุ่มนับ'],
+  ['cycle', 'ปรับจากแมนนวลสต็อก', 'แมนนวลสต็อก'],
 ];
 const REASON_SHORT = Object.fromEntries(REASONS.map(r => [r[0], r[2]]));
  
@@ -544,16 +544,67 @@ function groupMessage(data) {
 }
  
 async function notifyGroup(data) {
+  state.lastNotify = data;
+  state.notifyWhy = '';
   try {
-    if (!data.progress || !liff.isInClient()) return 'skip';
+    if (!data.progress) return 'skip';
+    if (!liff.isInClient()) {
+      state.notifyWhy = 'เปิดลิงก์นอกแอป LINE บนมือถือ (เช่น LINE บนคอมพิวเตอร์ หรือเบราว์เซอร์)';
+      return 'skip';
+    }
     const ctx = liff.getContext();
-    if (!ctx || !['group', 'room'].includes(ctx.type)) return 'skip';
+    if (!ctx || !['group', 'room'].includes(ctx.type)) {
+      const where = { utou: 'แชทส่วนตัว', external: 'นอกห้องแชท (เช่น Keep / ลิงก์ภายนอก)', none: 'นอกห้องแชท' }[ctx && ctx.type] || (ctx && ctx.type) || 'ไม่ทราบ';
+      state.notifyWhy = 'เปิดลิงก์จาก' + where + ' ไม่ใช่จากในกลุ่ม';
+      return 'skip';
+    }
     await liff.sendMessages([{ type: 'text', text: groupMessage(data) }]);
     return 'sent';
   } catch (e) {
     console.warn('sendMessages failed', e);
+    const msg = String((e && (e.code || '')) + ' ' + (e && e.message || e)).trim();
+    state.notifyWhy = /403|permission|scope|consent/i.test(msg)
+      ? 'ยังไม่ได้อนุญาตสิทธิ์ส่งข้อความ (' + msg + ') · ปิดหน้านี้ แล้วเปิดลิงก์จากกลุ่มใหม่ และกด "อนุญาต"'
+      : msg;
     return 'fail';
   }
+}
+ 
+function notifyBox() {
+  const n = state.notify;
+  if (!n) return '';
+  if (n === 'sending') return `<div class="alert" style="background:#f3f4f6;color:var(--muted);margin:-4px 0 12px">กำลังส่งแจ้งเตือนเข้ากลุ่ม...</div>`;
+  if (n === 'sent') return `<div class="alert" style="background:var(--green-soft);color:var(--green-dark);margin:-4px 0 12px">📣 ส่งแจ้งเตือนเข้ากลุ่มแล้ว</div>`;
+  const canShare = liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker');
+  return `
+    <div class="alert warn" style="margin:-4px 0 12px">
+      <b>บันทึกสำเร็จ แต่ยังไม่ได้ส่งแจ้งเตือนเข้ากลุ่ม</b><br>
+      สาเหตุ: ${esc(state.notifyWhy || 'ไม่ทราบ')}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        ${n === 'fail' ? `<button class="chip" id="nf-retry">ส่งอีกครั้ง</button>` : ''}
+        ${canShare ? `<button class="chip" id="nf-share">เลือกกลุ่มแล้วส่ง</button>` : ''}
+        <button class="chip" id="nf-copy">คัดลอกข้อความ</button>
+      </div>
+    </div>`;
+}
+ 
+function bindNotifyBox(rerender) {
+  const data = state.lastNotify;
+  if (!data) return;
+  const retry = document.getElementById('nf-retry');
+  if (retry) retry.onclick = async () => { state.notify = 'sending'; rerender(); state.notify = await notifyGroup(data); rerender(); };
+  const share = document.getElementById('nf-share');
+  if (share) share.onclick = async () => {
+    try {
+      const r = await liff.shareTargetPicker([{ type: 'text', text: groupMessage(data) }]);
+      if (r) { state.notify = 'sent'; rerender(); }
+    } catch (e) { alert('ส่งไม่สำเร็จ: ' + (e.message || e)); }
+  };
+  const copy = document.getElementById('nf-copy');
+  if (copy) copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(groupMessage(data)); copy.textContent = 'คัดลอกแล้ว ✓'; }
+    catch (e) { prompt('คัดลอกข้อความนี้ไปวางในกลุ่ม', groupMessage(data)); }
+  };
 }
  
 /* ---------- ปิดงานแล้ว ---------- */
@@ -574,12 +625,6 @@ function closingRows(c) {
 function renderDone() {
   const c = state.me.closing;
   const issue = isIssue(c);
-  const note = {
-    sending: `<div class="alert" style="background:#f3f4f6;color:var(--muted)">กำลังส่งแจ้งเตือนเข้ากลุ่ม...</div>`,
-    sent: `<div class="alert" style="background:var(--green-soft);color:var(--green-dark)">📣 ส่งแจ้งเตือนเข้ากลุ่มแล้ว</div>`,
-    skip: `<div class="alert warn">ไม่ได้ส่งแจ้งเตือนเข้ากลุ่ม เพราะไม่ได้เปิดลิงก์จากในกลุ่มของแห้ง</div>`,
-    fail: `<div class="alert warn">บันทึกสำเร็จ แต่ส่งแจ้งเตือนเข้ากลุ่มไม่ได้</div>`,
-  }[state.notify] || '';
   view.innerHTML = `
     <div class="card center">
       <div class="done-icon" ${issue ? 'style="background:var(--amber-soft);color:var(--amber)"' : ''}>${issue ? '!' : '✓'}</div>
@@ -588,13 +633,14 @@ function renderDone() {
       ${issue ? `<div class="alert warn">${esc(c.status)}</div>` : ''}
       <div class="rows" style="text-align:left">${closingRows(c)}</div>
     </div>
-    ${note ? `<div style="margin:-4px 0 12px">${note}</div>` : ''}
+    ${notifyBox()}
     ${liff.isInClient() ? `<button class="btn" id="close">กลับไปที่ LINE กลุ่ม</button>` : ''}
     <button class="btn ghost" id="edit">แก้ไขข้อมูล</button>
     <button class="btn ghost" id="view-detail">ดูรายละเอียด รูป และประวัติแก้ไข</button>
   `;
   const close = document.getElementById('close');
   if (close) close.onclick = () => liff.closeWindow();
+  bindNotifyBox(renderDone);
   document.getElementById('view-detail').onclick = () => openDetail(state.me.businessDate, c.department);
   document.getElementById('edit').onclick = () => {
     state.form = {
