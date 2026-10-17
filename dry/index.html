@@ -302,9 +302,36 @@ function formValid() {
   return true;
 }
  
+function missingFields() {
+  const f = state.form;
+  const m = [];
+  if (!isCount(f.outShelf)) m.push('Out Shelf');
+  if (!isCount(f.outStock)) m.push('Out Stock');
+  if (f.hasAdj === null) m.push('เลือกว่ามีการปรับสต็อกหรือไม่');
+  if (f.hasAdj) f.lines.forEach((l, i) => {
+    const n = 'รายการปรับที่ ' + (i + 1) + ': ';
+    if (!l.reason) m.push(n + 'สาเหตุ');
+    if (!l.direction) m.push(n + 'ปรับเพิ่ม/ลด');
+    if (num(l.amount) <= 0) m.push(n + 'มูลค่า');
+    if (!l.photos.length && !l.keepFrom) m.push(n + 'รูปหลักฐาน');
+  });
+  if (!f.priceStatus) m.push('ผลตรวจป้ายราคา');
+  if (f.priceStatus === 'issue') {
+    if (!isCount(f.priceIssueCount) || num(f.priceIssueCount) < 1) m.push('จำนวนป้ายที่มีปัญหา');
+    if (f.priceFixed === null) m.push('แก้ป้ายแล้วหรือยัง');
+  }
+  return m;
+}
+ 
 function refreshSubmit() {
   const b = document.getElementById('submit');
   if (b) b.disabled = !formValid();
+  const box = document.getElementById('missing');
+  if (box) {
+    const m = state.submitting || state.preparing ? [] : missingFields();
+    box.style.display = m.length ? 'block' : 'none';
+    box.innerHTML = m.length ? 'ยังกรอกไม่ครบ: ' + m.map(esc).join(' · ') : '';
+  }
   const net = document.getElementById('net');
   if (net) {
     const n = state.form.lines.reduce((s, l) => s + (l.direction === 'plus' ? 1 : l.direction === 'minus' ? -1 : 0) * num(l.amount), 0);
@@ -354,9 +381,9 @@ function renderForm() {
       <div class="q"><span>01</span>Gap สินค้า (จำนวนรายการ)</div>
       <div class="amt">
         <div class="field"><label>Out Shelf</label>
-          <input id="outShelf" inputmode="numeric" placeholder="0" value="${esc(f.outShelf)}"></div>
+          <input id="outShelf" inputmode="numeric" placeholder="กรอกจำนวน" value="${esc(f.outShelf)}"></div>
         <div class="field"><label>Out Stock</label>
-          <input id="outStock" inputmode="numeric" placeholder="0" value="${esc(f.outStock)}"></div>
+          <input id="outStock" inputmode="numeric" placeholder="กรอกจำนวน" value="${esc(f.outStock)}"></div>
       </div>
       <div class="muted small" style="margin-top:6px">Out Shelf = มีของหลังบ้านแต่ยังไม่ได้เติม · Out Stock = สต็อกเป็น 0 · ไม่มีให้ใส่ 0</div>
     </div>
@@ -389,6 +416,7 @@ function renderForm() {
         <textarea id="note" rows="2" maxlength="300" placeholder="เช่น รอสินค้าเข้าวันพรุ่งนี้">${esc(f.note)}</textarea></div>
     </div>
  
+    <div id="missing" class="alert warn" style="margin-bottom:10px;display:none"></div>
     <button class="btn" id="submit">${state.submitting ? 'กำลังอัปโหลดรูปและบันทึก...' : state.editing ? 'บันทึกการแก้ไข' : 'ยืนยันปิดงาน'}</button>
     ${state.editing ? `<button class="btn ghost" id="cancel">ยกเลิกการแก้ไข</button>` : ''}
   `;
