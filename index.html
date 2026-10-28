@@ -159,7 +159,7 @@
   <button data-tab="dash">ภาพรวม 6 แผนก</button>
 </nav>
 <main id="view"></main>
- 
+
 <script>
 /* ===== ตั้งค่า: ใส่ 2 ค่านี้ก่อนใช้งาน ===== */
 const CONFIG = {
@@ -167,7 +167,7 @@ const CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbx5gq9V71iqmPd2kXq2UyxRQ-MOWiSG8k0eEoorCBgbqMvXFIvqUgn6l-_vi7vJoQiD/exec',
 };
 /* ========================================== */
- 
+
 const view = document.getElementById('view');
 const tabs = document.getElementById('tabs');
 const state = {
@@ -182,7 +182,7 @@ const state = {
   detail: null,        // { date, department } เมื่อเปิดหน้ารายละเอียด
 };
 const MAX_PHOTOS = 3;
- 
+
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const baht = n => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
 const num = v => Number(String(v || '').replace(/,/g, '')) || 0;
@@ -195,11 +195,11 @@ const thaiDate = iso => {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 };
- 
+
 function loading(msg) {
   view.innerHTML = `<div class="spinner"></div><p class="center muted">${esc(msg || 'กำลังโหลด...')}</p>`;
 }
- 
+
 function showError(msg) {
   view.innerHTML = `
     <div class="card center">
@@ -209,7 +209,7 @@ function showError(msg) {
     </div>`;
   document.getElementById('retry').onclick = () => location.reload();
 }
- 
+
 async function api(action, payload) {
   const idToken = liff.getIDToken();
   const res = await fetch(CONFIG.API_URL, {
@@ -227,7 +227,7 @@ async function api(action, payload) {
   }
   return json.data;
 }
- 
+
 /* ---------- Tabs ---------- */
 tabs.addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]');
@@ -237,7 +237,7 @@ tabs.addEventListener('click', e => {
   [...tabs.children].forEach(x => x.classList.toggle('active', x === b));
   render();
 });
- 
+
 function render() {
   const me = state.me;
   if (!me.registered) return renderPending();
@@ -246,7 +246,7 @@ function render() {
   if (me.closing && !state.editing) return renderDone();
   return renderForm();
 }
- 
+
 /* ---------- ยังไม่ได้รับสิทธิ์ ---------- */
 function renderPending() {
   tabs.classList.remove('show');
@@ -259,24 +259,24 @@ function renderPending() {
       ${inactive ? 'กรุณาติดต่อผู้ดูแลระบบ' : 'รอผู้ดูแลกำหนดแผนกให้ แล้วเปิดลิงก์นี้อีกครั้ง'}</p>
     </div>`;
 }
- 
+
 /* ---------- ฟอร์มปิดงาน ---------- */
 function renderForm() {
   const f = state.form;
   const me = state.me;
   const opt = (group, value, label, cls = '') =>
     `<button class="opt ${f[group] === value ? 'sel ' + cls : ''}" data-g="${group}" data-v="${String(value)}">${label}</button>`;
- 
+
   const canSubmit = formValid();
   const usingOld = state.editing && state.existingPhotos > 0 && !f.photos.length;
- 
+
   view.innerHTML = `
     <div class="card">
       <div class="muted">${esc(thaiDate(me.businessDate))}</div>
       <div class="dept">แผนก${esc(me.department)}</div>
       <div class="muted">ผู้ปิดงาน: ${esc(me.name)}${state.editing ? ' · <b style="color:var(--amber)">กำลังแก้ไข</b>' : ''}</div>
     </div>
- 
+
     <div class="card">
       <div class="q"><span>01</span>ตรวจสอบวันหมดอายุ</div>
       ${opt('expiryStatus', 'ok', '✅ ตรวจแล้ว ไม่พบปัญหา')}
@@ -289,7 +289,7 @@ function renderForm() {
           <textarea id="note" rows="2" maxlength="300" placeholder="เช่น นมจืด 3 กล่อง เก็บออกแล้ว">${esc(f.note)}</textarea>
         </div>` : ''}
     </div>
- 
+
     <div class="card">
       <div class="q"><span>02</span>การปรับสต็อก</div>
       ${opt('stockAdjusted', false, 'ไม่มีการปรับสต็อก')}
@@ -318,13 +318,13 @@ function renderForm() {
         </div>
         ${!f.photos.length && !usingOld ? `<div class="alert warn" style="margin-top:8px">ต้องแนบรูปก่อนจึงจะยืนยันได้</div>` : ''}` : ''}
     </div>
- 
+
     <button class="btn" id="submit" ${canSubmit ? '' : 'disabled'}>
       ${state.submitting ? (f.stockAdjusted && f.photos.length ? 'กำลังอัปโหลดรูปและบันทึก...' : 'กำลังบันทึก...') : state.editing ? 'บันทึกการแก้ไข' : 'ยืนยันปิดงาน'}
     </button>
     ${state.editing ? `<button class="btn ghost" id="cancel">ยกเลิกการแก้ไข</button>` : ''}
   `;
- 
+
   view.querySelectorAll('.opt').forEach(b => b.onclick = () => {
     const g = b.dataset.g;
     let v = b.dataset.v;
@@ -333,7 +333,7 @@ function renderForm() {
     renderForm();
     if (g === 'stockAdjusted' && v === true) document.getElementById('minus')?.focus();
   });
- 
+
   ['plus', 'minus'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -345,22 +345,22 @@ function renderForm() {
       document.getElementById('submit').disabled = !formValid();
     };
   });
- 
+
   const note = document.getElementById('note');
   if (note) note.oninput = () => { f.note = note.value; };
- 
+
   const pick = document.getElementById('pick');
   if (pick) pick.onchange = () => { addPhotos(pick.files); pick.value = ''; };
   view.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => {
     f.photos.splice(Number(b.dataset.rm), 1);
     renderForm();
   });
- 
+
   document.getElementById('submit').onclick = submit;
   const cancel = document.getElementById('cancel');
   if (cancel) cancel.onclick = () => { state.editing = false; render(); };
 }
- 
+
 function formValid() {
   const f = state.form;
   if (!['ok', 'issue'].includes(f.expiryStatus) || f.stockAdjusted === null) return false;
@@ -371,7 +371,7 @@ function formValid() {
   }
   return true;
 }
- 
+
 /** ย่อรูปบนมือถือก่อนส่ง (ด้านยาวสุด 1280px, JPEG) ให้อัปโหลดเร็วและไม่เปลืองพื้นที่ */
 async function compressImage(file) {
   const url = URL.createObjectURL(file);
@@ -392,7 +392,7 @@ async function compressImage(file) {
     URL.revokeObjectURL(url);
   }
 }
- 
+
 async function addPhotos(files) {
   const f = state.form;
   const room = MAX_PHOTOS - f.photos.length;
@@ -410,7 +410,7 @@ async function addPhotos(files) {
     renderForm();
   }
 }
- 
+
 async function submit() {
   const f = state.form;
   state.submitting = true;
@@ -438,7 +438,7 @@ async function submit() {
     render();
   }
 }
- 
+
 /* ---------- แจ้งเตือนเข้ากลุ่ม (ส่งในนามผู้ปิดงาน ไม่กินโควตา OA) ---------- */
 function groupMessage(data) {
   const c = data.closing;
@@ -454,7 +454,7 @@ function groupMessage(data) {
   if (c.stockPlus) stock.push(`+฿${plain(c.stockPlus)}`);
   if (c.stockMinus) stock.push(`−฿${plain(c.stockMinus)}`);
   lines.push(`📦 ปรับสต็อก: ${stock.length ? stock.join(' / ') : 'ไม่มี'}`);
-  if (c.photoCount) lines.push(`📷 แนบรูปหลักฐาน ${c.photoCount} รูป`);
+  if (c.photoCount) lines.push(`📷 แนบรูปหลักฐาน ${c.photoCount} รูป${(data.groupPhotos || []).length ? ' (รูปตามด้านล่าง)' : ''}`);
   lines.push('━━━━━━━━━━');
   if (!p.pending.length) {
     lines.push(`🎉 ปิดครบ ${p.doneCount}/${p.totalDepartments} แผนกแล้ว`);
@@ -465,7 +465,7 @@ function groupMessage(data) {
   }
   return lines.join('\n');
 }
- 
+
 async function notifyGroup(data) {
   state.lastNotify = data;
   state.notifyWhy = '';
@@ -482,6 +482,13 @@ async function notifyGroup(data) {
       return 'skip';
     }
     await liff.sendMessages([{ type: 'text', text: groupMessage(data) }]);
+    // ส่งรูปหลักฐานตามหลังข้อความ (ครั้งละไม่เกิน 5 รูป)
+    state.photoFail = false;
+    const imgs = photoMessages(data);
+    for (let i = 0; i < imgs.length; i += 5) {
+      try { await liff.sendMessages(imgs.slice(i, i + 5)); }
+      catch (e) { console.warn('send photos failed', e); state.photoFail = true; break; }
+    }
     return 'sent';
   } catch (e) {
     console.warn('sendMessages failed', e);
@@ -492,12 +499,16 @@ async function notifyGroup(data) {
     return 'fail';
   }
 }
- 
+
+function photoMessages(data) {
+  return (data.groupPhotos || []).map(p => ({ type: 'image', originalContentUrl: p.original, previewImageUrl: p.preview }));
+}
+
 function notifyBox() {
   const n = state.notify;
   if (!n) return '';
   if (n === 'sending') return `<div class="alert" style="background:#f3f4f6;color:var(--muted);margin:-4px 0 12px">กำลังส่งแจ้งเตือนเข้ากลุ่ม...</div>`;
-  if (n === 'sent') return `<div class="alert" style="background:var(--green-soft);color:var(--green-dark);margin:-4px 0 12px">📣 ส่งแจ้งเตือนเข้ากลุ่มแล้ว</div>`;
+  if (n === 'sent') return `<div class="alert" style="background:var(--green-soft);color:var(--green-dark);margin:-4px 0 12px">📣 ส่งแจ้งเตือนเข้ากลุ่มแล้ว${state.photoFail ? ' (แต่ส่งรูปไม่สำเร็จ ดูรูปได้ในระบบ)' : ''}</div>`;
   const canShare = liff.isApiAvailable && liff.isApiAvailable('shareTargetPicker');
   return `
     <div class="alert warn" style="margin:-4px 0 12px">
@@ -510,7 +521,7 @@ function notifyBox() {
       </div>
     </div>`;
 }
- 
+
 function bindNotifyBox(rerender) {
   const data = state.lastNotify;
   if (!data) return;
@@ -519,7 +530,7 @@ function bindNotifyBox(rerender) {
   const share = document.getElementById('nf-share');
   if (share) share.onclick = async () => {
     try {
-      const r = await liff.shareTargetPicker([{ type: 'text', text: groupMessage(data) }]);
+      const r = await liff.shareTargetPicker([{ type: 'text', text: groupMessage(data) }].concat(photoMessages(data).slice(0, 4)));
       if (r) { state.notify = 'sent'; rerender(); }
     } catch (e) { alert('ส่งไม่สำเร็จ: ' + (e.message || e)); }
   };
@@ -529,7 +540,7 @@ function bindNotifyBox(rerender) {
     catch (e) { prompt('คัดลอกข้อความนี้ไปวางในกลุ่ม', groupMessage(data)); }
   };
 }
- 
+
 /* ---------- ปิดงานแล้ว ---------- */
 function renderDone() {
   const c = state.me.closing;
@@ -576,14 +587,14 @@ function renderDone() {
     renderForm();
   };
 }
- 
+
 /* ---------- ภาพรวม 6 แผนก ---------- */
 const isoAdd = (iso, days) => {
   const t = new Date(iso + 'T12:00:00Z');
   t.setUTCDate(t.getUTCDate() + days);
   return t.toISOString().slice(0, 10);
 };
- 
+
 async function renderDashboard() {
   loading('กำลังโหลดภาพรวม...');
   const isManager = state.me.role === 'manager';
@@ -657,19 +668,19 @@ async function renderDashboard() {
     showError(e.message);
   }
 }
- 
+
 /* ---------- รายละเอียดแผนก: รูปหลักฐาน + ประวัติแก้ไข ---------- */
 function openDetail(date, department) {
   state.detail = { date, department };
   window.scrollTo(0, 0);
   render();
 }
- 
+
 function closeDetail() {
   state.detail = null;
   render();
 }
- 
+
 function zoom(src) {
   const z = document.createElement('div');
   z.className = 'zoom';
@@ -677,7 +688,7 @@ function zoom(src) {
   z.onclick = () => z.remove();
   document.body.appendChild(z);
 }
- 
+
 async function renderDetail() {
   const want = state.detail;
   loading('กำลังโหลดรายละเอียดและรูป...');
@@ -731,7 +742,7 @@ async function renderDetail() {
     document.getElementById('back').onclick = closeDetail;
   }
 }
- 
+
 /* ---------- เริ่มต้น ---------- */
 (async function init() {
   loading('กำลังเชื่อมต่อ LINE...');
