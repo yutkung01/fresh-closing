@@ -127,7 +127,12 @@
     background: rgba(0,0,0,.6); color: #fff; font-size: 14px; line-height: 26px; padding: 0; }
   .addph { aspect-ratio: 1; border: 1.5px dashed #c7cdd4; border-radius: 10px; display: flex; flex-direction: column;
     align-items: center; justify-content: center; color: var(--green-dark); font-size: 26px; cursor: pointer; }
-  .addph span { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .addph span { font-size: 12px; color: var(--muted); margin-top: 2px; text-align: center; padding: 0 4px; }
+  .hint { font-size: 14px; background: #f3f4f6; border-radius: 10px; padding: 10px 12px; margin: -2px 0 10px; line-height: 1.55; }
+  .pmod { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: center; border-top: 1px dashed var(--line); padding: 10px 0; }
+  .pmod:first-of-type { border-top: 0; padding-top: 0; }
+  .pmod-h { font-weight: 700; }
+  .pmod-r { display: grid; gap: 6px; }
   .datenav { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
   .datenav button { flex: none; width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line);
     background: #fff; font-size: 20px; color: var(--ink); }
@@ -166,7 +171,7 @@
 <body>
 <header>
   <div class="title">Dry Daily Closing</div>
-  <div class="sub" id="hdr-sub">Gap · ปรับสต็อก · ป้ายราคา</div>
+  <div class="sub" id="hdr-sub">Gap · ปรับสต็อก · Back Stock · ป้ายราคา</div>
 </header>
 <nav id="tabs">
   <button data-tab="close" class="active">ปิดงานแผนก</button>
@@ -194,14 +199,18 @@ const REASON_SHORT = Object.fromEntries(REASONS.map(r => [r[0], r[2]]));
 
 const view = document.getElementById('view');
 const tabs = document.getElementById('tabs');
+const PRICE_MODS = 3;
 const emptyForm = () => ({
   outShelf: '', outStock: '', hasAdj: null, lines: [],
-  priceStatus: '', priceIssueCount: '', priceFixed: null, note: '',
+  backstockDone: false, backstockPhotos: [],
+  priceMods: Array.from({ length: PRICE_MODS }, () => ({ result: '', photo: '' })),
+  note: '',
 });
 const newLine = () => ({ reason: '', direction: '', amount: '', photos: [], keepFrom: '', keepCount: 0 });
 const state = {
   me: null, tab: 'close', editing: false, submitting: false, preparing: false,
   form: emptyForm(), dashDate: null, detail: null, notify: null,
+  existing: { backstock: 0, price: 0 },
 };
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -221,8 +230,11 @@ const isoAdd = (iso, days) => {
   return t.toISOString().slice(0, 10);
 };
 const isIssue = c => c && c.status && c.status !== 'เสร็จ';
-const priceText = c => c.priceStatus === 'พบปัญหา'
-  ? `พบปัญหา ${c.priceIssueCount} ป้าย · ${esc(c.priceFixed)}` : 'ครบและตรง';
+const priceText = c => (c.priceMods && c.priceMods.length)
+  ? c.priceMods.map(m => `${esc(m.mod)} ${m.result === 'fixed' ? '⚠️ผิด-แก้แล้ว' : '✅'}`).join(' · ')
+  : c.priceStatus === 'พบปัญหา' ? `พบปัญหา ${c.priceIssueCount} ป้าย · ${esc(c.priceFixed)}` : esc(c.priceStatus || '-');
+const priceMsg = c => (c.priceMods && c.priceMods.length)
+  ? c.priceMods.map(m => `${m.mod} ${m.result === 'fixed' ? '⚠️ผิด-แก้แล้ว' : '✅'}`).join(' · ') : '-';
 
 function loading(msg) {
   view.innerHTML = `<div class="spinner"></div><p class="center muted">${esc(msg || 'กำลังโหลด...')}</p>`;
@@ -297,10 +309,11 @@ function formValid() {
       if (!l.photos.length && !l.keepFrom) return false;
     }
   }
-  if (!f.priceStatus) return false;
-  if (f.priceStatus === 'issue' && (!isCount(f.priceIssueCount) || num(f.priceIssueCount) < 1 || f.priceFixed === null)) return false;
-  return true;
+  return missingFields().length === 0;
 }
+
+const hasBackstock = () => state.form.backstockPhotos.length > 0 || (state.editing && state.existing.backstock > 0);
+const hasPricePhoto = i => !!state.form.priceMods[i].photo || (state.editing && state.existing.price > i);
 
 function missingFields() {
   const f = state.form;
@@ -315,11 +328,12 @@ function missingFields() {
     if (num(l.amount) <= 0) m.push(n + 'มูลค่า');
     if (!l.photos.length && !l.keepFrom) m.push(n + 'รูปหลักฐาน');
   });
-  if (!f.priceStatus) m.push('ผลตรวจป้ายราคา');
-  if (f.priceStatus === 'issue') {
-    if (!isCount(f.priceIssueCount) || num(f.priceIssueCount) < 1) m.push('จำนวนป้ายที่มีปัญหา');
-    if (f.priceFixed === null) m.push('แก้ป้ายแล้วหรือยัง');
-  }
+  if (!f.backstockDone) m.push('ติ๊กจัดเรียง Back Stock');
+  if (!hasBackstock()) m.push('รูป Back Stock');
+  f.priceMods.forEach((x, i) => {
+    if (!hasPricePhoto(i)) m.push(`รูปป้ายราคา Mod ${i + 1}`);
+    if (!x.result) m.push(`ผลตรวจป้าย Mod ${i + 1}`);
+  });
   return m;
 }
 
@@ -399,16 +413,40 @@ function renderForm() {
     </div>
 
     <div class="card">
-      <div class="q"><span>03</span>ตรวจเช็กป้ายราคา</div>
-      ${opt('priceStatus', 'ok', '✅ ครบและตรง')}
-      ${opt('priceStatus', 'issue', '⚠️ พบป้ายไม่ครบ / ไม่ตรง', 'warn')}
-      ${f.priceStatus === 'issue' ? `
-        <div class="field"><label>จำนวนป้ายที่มีปัญหา</label>
-          <input id="priceCount" inputmode="numeric" placeholder="เช่น 3" value="${esc(f.priceIssueCount)}"></div>
-        <div class="chips" style="margin-top:8px">
-          <button class="chip ${f.priceFixed === true ? 'sel' : ''}" data-fixed="1">แก้ไขแล้ว</button>
-          <button class="chip ${f.priceFixed === false ? 'sel warn' : ''}" data-fixed="0">ยังไม่แก้</button>
-        </div>` : ''}
+      <div class="q"><span>03</span>Back Stock</div>
+      <div class="hint">จัดเรียง Back Stock ให้เรียบร้อย แล้วถ่ายรูป</div>
+      <button class="opt ${f.backstockDone ? 'sel' : ''}" id="bs">${f.backstockDone ? '☑️' : '⬜'} จัดเรียง Back Stock เรียบร้อยแล้ว</button>
+      <div class="lbl">📷 รูป Back Stock <span class="muted">(อย่างน้อย 1 รูป สูงสุด ${MAX_PHOTOS})</span></div>
+      ${state.editing && state.existing.backstock && !f.backstockPhotos.length ? `<div class="muted small">ใช้รูปเดิม ${state.existing.backstock} รูป · ถ้าเลือกรูปใหม่ จะแทนที่รูปเดิม</div>` : ''}
+      <div class="pgrid">
+        ${f.backstockPhotos.map((u, j) => `<div class="ph"><img src="${u}" alt=""><button class="rm" data-bsrm="${j}" aria-label="ลบรูป">✕</button></div>`).join('')}
+        ${f.backstockPhotos.length < MAX_PHOTOS ? `
+          <label class="addph">${state.preparing === 'bs' ? '<div class="spinner sm"></div><span>กำลังเตรียมรูป</span>' : '＋<span>ถ่าย / เลือกรูป</span>'}
+            <input type="file" accept="image/*" multiple id="bspick" hidden ${state.preparing ? 'disabled' : ''}>
+          </label>` : ''}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="q"><span>04</span>สุ่มตรวจป้ายราคา วันละ ${PRICE_MODS} Mods</div>
+      <div class="hint">สุ่ม ${PRICE_MODS} Mods ถ่ายรูปป้ายราคา Mod ละ 1 รูป แล้วตอบผลตรวจ · ถ้าเจอป้ายผิดให้แก้ก่อนส่ง</div>
+      ${f.priceMods.map((m, i) => {
+        const old = state.editing && state.existing.price > i;
+        const busy = state.preparing === 'price' + i;
+        return `
+        <div class="pmod">
+          <div>
+            ${m.photo ? `<div class="ph"><img src="${m.photo}" alt="รูปป้ายราคา Mod ${i + 1}"><button class="rm" data-prm="${i}" aria-label="ลบรูป">✕</button></div>`
+              : `<label class="addph">${busy ? '<div class="spinner sm"></div>' : old ? '🖼<span>รูปเดิม · แตะเพื่อเปลี่ยน</span>' : '＋<span>ถ่ายรูป</span>'}
+                  <input type="file" accept="image/*" data-pslot="${i}" hidden ${state.preparing ? 'disabled' : ''}></label>`}
+          </div>
+          <div class="pmod-r">
+            <div class="pmod-h">Mod ${i + 1}</div>
+            <button class="chip ${m.result === 'ok' ? 'sel' : ''}" data-pr="${i}:ok">✅ ถูกต้อง</button>
+            <button class="chip ${m.result === 'fixed' ? 'sel warn' : ''}" data-pr="${i}:fixed">⚠️ ผิด แก้แล้ว</button>
+          </div>
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="card">
@@ -421,7 +459,7 @@ function renderForm() {
     ${state.editing ? `<button class="btn ghost" id="cancel">ยกเลิกการแก้ไข</button>` : ''}
   `;
 
-  view.querySelectorAll('.opt').forEach(b => b.onclick = () => {
+  view.querySelectorAll('.opt[data-g]').forEach(b => b.onclick = () => {
     const g = b.dataset.g;
     let v = b.dataset.v;
     if (g === 'hasAdj') {
@@ -435,7 +473,34 @@ function renderForm() {
     f.lines[Number(b.dataset.line)][b.dataset.f] = b.dataset.v;
     renderForm();
   });
-  view.querySelectorAll('[data-fixed]').forEach(b => b.onclick = () => { f.priceFixed = b.dataset.fixed === '1'; renderForm(); });
+  document.getElementById('bs').onclick = () => { f.backstockDone = !f.backstockDone; renderForm(); };
+  const bsPick = document.getElementById('bspick');
+  if (bsPick) bsPick.onchange = async () => {
+    const room = MAX_PHOTOS - f.backstockPhotos.length;
+    const list = [...bsPick.files].slice(0, room);
+    if (bsPick.files.length > room) alert(`แนบได้สูงสุด ${MAX_PHOTOS} รูป`);
+    if (!list.length) return;
+    state.preparing = 'bs'; renderForm();
+    try { for (const file of list) f.backstockPhotos.push(await compressImage(file)); }
+    catch (e) { alert(e.message); }
+    finally { state.preparing = false; renderForm(); }
+  };
+  view.querySelectorAll('[data-bsrm]').forEach(b => b.onclick = () => { f.backstockPhotos.splice(Number(b.dataset.bsrm), 1); renderForm(); });
+  view.querySelectorAll('[data-pr]').forEach(b => b.onclick = () => {
+    const [i, r] = b.dataset.pr.split(':');
+    f.priceMods[i].result = r;
+    renderForm();
+  });
+  view.querySelectorAll('input[data-pslot]').forEach(inp => inp.onchange = async () => {
+    const i = Number(inp.dataset.pslot);
+    const file = inp.files[0];
+    if (!file) return;
+    state.preparing = 'price' + i; renderForm();
+    try { f.priceMods[i].photo = await compressImage(file); }
+    catch (e) { alert(e.message); }
+    finally { state.preparing = false; renderForm(); }
+  });
+  view.querySelectorAll('[data-prm]').forEach(b => b.onclick = () => { f.priceMods[b.dataset.prm].photo = ''; renderForm(); });
   view.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
     f.lines.splice(Number(b.dataset.del), 1);
     if (!f.lines.length) f.hasAdj = null;
@@ -461,7 +526,6 @@ function renderForm() {
   };
   bindNum('outShelf', 'outShelf');
   bindNum('outStock', 'outStock');
-  bindNum('priceCount', 'priceIssueCount');
   const note = document.getElementById('note');
   note.oninput = () => { f.note = note.value; };
   const add = document.getElementById('addline');
@@ -522,9 +586,10 @@ async function submit() {
         reason: l.reason, direction: l.direction, amount: l.amount,
         photos: l.photos, keepFrom: l.photos.length ? '' : l.keepFrom,
       })) : [],
-      priceStatus: f.priceStatus,
-      priceIssueCount: f.priceStatus === 'issue' ? f.priceIssueCount : '',
-      priceFixed: f.priceStatus === 'issue' ? f.priceFixed : null,
+      backstockDone: f.backstockDone,
+      backstockPhotos: f.backstockPhotos,   // ว่าง = ใช้รูปเดิม (ตอนแก้ไข)
+      priceMods: f.priceMods.map(x => ({ result: x.result })),
+      pricePhotoSlots: f.priceMods.map(x => x.photo || ''),
       note: f.note,
     });
     state.me.closing = data.closing;
@@ -557,12 +622,11 @@ function groupMessage(data) {
   } else {
     lines.push('📦 ปรับสต็อก: ไม่มี');
   }
-  lines.push(c.priceStatus === 'พบปัญหา'
-    ? `🏷 ป้ายราคา: พบปัญหา ${c.priceIssueCount} ป้าย (${c.priceFixed})`
-    : '🏷 ป้ายราคา: ครบและตรง');
+  lines.push(`🗄 Back Stock: ${c.backstockDone ? 'จัดเรียงแล้ว' : '-'}${c.backstockPhotoCount ? ' 📷' + c.backstockPhotoCount : ''}`);
+  lines.push(`🏷 ป้ายราคา: ${priceMsg(c)}${c.pricePhotoCount ? ' 📷' + c.pricePhotoCount : ''}`);
   if (c.note) lines.push(`📝 ${c.note}`);
   const nPh = (data.groupPhotos || []).length;
-  if (nPh) lines.push(`📷 รูปหลักฐาน ${nPh} รูป (เรียงตามรายการปรับด้านบน)`);
+  if (nPh) lines.push(`📷 รูปหลักฐาน ${nPh} รูป ตามด้านล่าง (ปรับสต็อก → Back Stock → ป้ายราคา Mod 1–3)`);
   lines.push('━━━━━━━━━━');
   if (!p.pending.length) {
     lines.push(`🎉 ปิดครบ ${p.doneCount}/${p.totalDepartments} แผนกแล้ว`);
@@ -657,7 +721,8 @@ function closingRows(c) {
       <div class="row"><span>ปรับ ${i + 1}: ${esc(REASON_SHORT[a.reason])}</span><b>${lineAmt(a)}${a.photoCount ? ' · 📷' + a.photoCount : ''}</b></div>`).join('') + `
       <div class="row"><span>ยอดปรับสุทธิ</span><b>${signed(c.adjNet)}</b></div>`
       : `<div class="row"><span>ปรับสต็อก</span><b>ไม่มีการปรับ</b></div>`}
-    <div class="row"><span>ป้ายราคา</span><b>${priceText(c)}</b></div>
+    <div class="row"><span>Back Stock</span><b>${c.backstockDone ? 'จัดเรียงแล้ว' : '-'}${c.backstockPhotoCount ? ' · 📷' + c.backstockPhotoCount : ''}</b></div>
+    <div class="row"><span>ป้ายราคา</span><b>${priceText(c)}${c.pricePhotoCount ? ' · 📷' + c.pricePhotoCount : ''}</b></div>
     ${c.note ? `<div class="row"><span>หมายเหตุ</span><b>${esc(c.note)}</b></div>` : ''}
     <div class="row"><span>ผู้ปิดงาน</span><b>${esc(c.name)}</b></div>
     <div class="row" style="border-bottom:0"><span>เวลา</span><b>${esc(c.submittedAt)} น.${c.editCount ? ` · แก้ไข ${c.editCount} ครั้ง (ล่าสุด ${esc(c.updatedAt)})` : ''}</b></div>`;
@@ -691,11 +756,11 @@ function renderDone() {
         reason: a.reason, direction: a.direction, amount: String(a.amount),
         photos: [], keepFrom: a.id, keepCount: a.photoCount,
       })),
-      priceStatus: c.priceStatus === 'พบปัญหา' ? 'issue' : 'ok',
-      priceIssueCount: c.priceIssueCount ? String(c.priceIssueCount) : '',
-      priceFixed: c.priceStatus === 'พบปัญหา' ? c.priceFixed === 'แก้แล้ว' : null,
+      backstockDone: !!c.backstockDone, backstockPhotos: [],
+      priceMods: Array.from({ length: PRICE_MODS }, (_, i) => ({ result: (c.priceMods && c.priceMods[i] && c.priceMods[i].result) || '', photo: '' })),
       note: c.note || '',
     };
+    state.existing = { backstock: c.backstockPhotoCount || 0, price: c.pricePhotoCount || 0 };
     state.editing = true;
     renderForm();
   };
@@ -745,7 +810,7 @@ async function renderDashboard() {
               <div class="grow">
                 <div class="name">${esc(x.department)}</div>
                 <div class="muted">${x.done
-                  ? `${esc(x.name)} · ${esc(x.submittedAt)} น. · OS ${x.outShelf} · OOS ${x.outStock}${x.adjustments.length ? ' · ปรับ ' + signed(x.adjNet) + ' 📷' + x.photoCount : ''}${x.priceIssueCount ? ' · 🏷' + x.priceIssueCount + ' ' + esc(x.priceFixed) : ''}`
+                  ? `${esc(x.name)} · ${esc(x.submittedAt)} น. · OS ${x.outShelf} · OOS ${x.outStock}${x.adjustments.length ? ' · ปรับ ' + signed(x.adjNet) + ' 📷' + x.photoCount : ''}${x.priceIssueCount ? ' · 🏷ผิด ' + x.priceIssueCount + ' Mod ' + esc(x.priceFixed) : ''}`
                   : 'ยังไม่ปิดงาน'}</div>
               </div>
               <span class="tag ${x.done ? cls : 'wait'}">${!x.done ? 'รอ' : issue ? 'ป้ายค้าง' : 'เสร็จ'}</span>
@@ -829,7 +894,13 @@ async function renderDetail() {
           ${a.photos && a.photos.length
             ? `<div class="pgrid">${a.photos.map(u => `<div class="ph"><img src="${u}" alt="รูปหลักฐาน" data-zoom></div>`).join('')}</div>`
             : `<div class="muted">ไม่มีรูป (อาจถูกลบออกจาก Drive)</div>`}
-        </div>`).join('') + `<div class="muted small" style="margin:-6px 0 12px">แตะที่รูปเพื่อดูขนาดเต็ม</div>` : ''}
+        </div>`).join('') : ''}
+      ${(d.photoGroups || []).map(g => `
+        <div class="card">
+          <div class="q" style="margin-bottom:6px">📷 รูป ${esc(g.label)}</div>
+          <div class="pgrid">${g.photos.map(u => `<div class="ph"><img src="${u}" alt="รูป ${esc(g.label)}" data-zoom></div>`).join('')}</div>
+        </div>`).join('')}
+      ${(c && c.adjustments.length) || (d.photoGroups || []).length ? `<div class="muted small" style="margin:-6px 0 12px">แตะที่รูปเพื่อดูขนาดเต็ม</div>` : ''}
       ${d.history.length ? `
       <div class="card">
         <div class="q">🕘 ประวัติการบันทึก</div>
@@ -837,7 +908,7 @@ async function renderDetail() {
           ${d.history.map(h => `
             <div class="it ${h.action === 'edit' ? 'edit' : ''}">
               <b>${esc(h.time)} น. · ${h.action === 'edit' ? 'แก้ไข' : 'ปิดงาน'}</b> <span class="muted">โดย ${esc(h.name)}</span>
-              <div class="muted">OS ${h.outShelf} · OOS ${h.outStock} · ป้าย ${esc(h.priceStatus)}${h.priceIssueCount ? ' ' + h.priceIssueCount + ' ป้าย (' + esc(h.priceFixed) + ')' : ''}</div>
+              <div class="muted">OS ${h.outShelf} · OOS ${h.outStock}${h.backstockDone ? ' · Back Stock จัดเรียงแล้ว' : ''} · ป้าย ${h.priceMods && h.priceMods.length ? priceText(h) : esc(h.priceStatus) + (h.priceIssueCount ? ' ' + h.priceIssueCount + ' ป้าย (' + esc(h.priceFixed) + ')' : '')}</div>
               <div class="muted">${h.adjustments.length
                 ? h.adjustments.map(a => `${esc(REASON_SHORT[a.reason] || a.reason)} ${lineAmt(a)} 📷${a.photoCount}`).join(' · ')
                 : 'ไม่มีการปรับ'}</div>
@@ -868,7 +939,7 @@ async function renderDetail() {
     if (state.me.registered && state.me.role === 'supervisor') tabs.classList.add('show');
     if (state.me.registered) {
       document.getElementById('hdr-sub').textContent =
-        state.me.role === 'manager' ? 'ภาพรวมสำหรับผู้จัดการ' : 'Gap · ปรับสต็อก · ป้ายราคา';
+        state.me.role === 'manager' ? 'ภาพรวมสำหรับผู้จัดการ' : 'Gap · ปรับสต็อก · Back Stock · ป้ายราคา';
     }
     render();
   } catch (e) {
