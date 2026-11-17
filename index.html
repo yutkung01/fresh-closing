@@ -196,11 +196,24 @@ const MAX_PHOTOS = 3;
 const PHOTO_KEYS = ['expiry', 'cold', 'fifo', 'red', 'amber', 'price', 'stock'];
 function emptyForm() {
   return { expiryStatus: '', note: '', coldStatus: '', coldNote: '', fifoDone: false, redCleared: false,
+    countSku: '', countSys: '', countAct: '',
     priceMods: Array.from({ length: PRICE_MODS }, () => ({ result: '', photo: '' })),
     stockAdjusted: null, stockPlus: '', stockMinus: '',
-    photos: { expiry: [], cold: [], fifo: [], red: [], amber: [], price: [], stock: [] } };
+    photos: { expiry: [], cold: [], fifo: [], red: [], amber: [], price: [], count: [], stock: [] } };
 }
 const ISSUE_LABEL = 'ตรวจแล้ว พบสินค้ามีปัญหา';
+const rules = () => (state.me && state.me.rules) || { zone: true, countItem: '' };
+const isQty = v => /^\d+(\.\d+)?$/.test(String(v ?? '').replace(/,/g, '').trim());
+const qty = v => Number(String(v ?? '').replace(/,/g, '')) || 0;
+function diffText(sys, act) {
+  const d = Math.round((act - sys) * 1000) / 1000;
+  return d === 0 ? '✅ ตรง' : d < 0 ? `⚠️ ขาด ${-d}` : `⚠️ เกิน ${d}`;
+}
+function countDiff() {
+  const f = state.form;
+  if (!isQty(f.countSys) || !isQty(f.countAct)) return '-';
+  return diffText(qty(f.countSys), qty(f.countAct));
+}
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const baht = n => Number(n || 0).toLocaleString('th-TH', { maximumFractionDigits: 2 });
@@ -287,6 +300,10 @@ function renderForm() {
     `<button class="opt ${f[group] === value ? 'sel ' + cls : ''}" data-g="${group}" data-v="${String(value)}">${label}</button>`;
 
   const canSubmit = formValid();
+  const R = rules();
+  let sec = 0;
+  const no = () => String(++sec).padStart(2, '0');
+  const diff = countDiff();
 
   view.innerHTML = `
     <div class="card">
@@ -296,7 +313,7 @@ function renderForm() {
     </div>
 
     <div class="card">
-      <div class="q"><span>01</span>ตรวจสอบวันหมดอายุ (หน้าร้าน)</div>
+      <div class="q"><span>${no()}</span>ตรวจสอบวันหมดอายุ (หน้าร้าน)</div>
       ${opt('expiryStatus', 'ok', '✅ ตรวจแล้ว ไม่พบปัญหา')}
       ${opt('expiryStatus', 'issue', '⚠️ ตรวจแล้ว พบสินค้ามีปัญหา', 'warn')}
       ${opt('expiryStatus', 'notdone', '⏳ ยังตรวจไม่เสร็จ', 'bad')}
@@ -310,7 +327,7 @@ function renderForm() {
     </div>
 
     <div class="card">
-      <div class="q"><span>02</span>ตรวจสอบวันหมดอายุในห้องเย็น</div>
+      <div class="q"><span>${no()}</span>ตรวจสอบวันหมดอายุในห้องเย็น</div>
       ${opt('coldStatus', 'ok', '✅ ตรวจแล้ว ไม่พบปัญหา')}
       ${opt('coldStatus', 'issue', '⚠️ ตรวจแล้ว พบสินค้ามีปัญหา', 'warn')}
       ${opt('coldStatus', 'notdone', '⏳ ยังตรวจไม่เสร็จ', 'bad')}
@@ -324,7 +341,7 @@ function renderForm() {
     </div>
 
     <div class="card">
-      <div class="q"><span>03</span>FIFO (ของเข้าก่อน ออกก่อน)</div>
+      <div class="q"><span>${no()}</span>FIFO (ของเข้าก่อน ออกก่อน)</div>
       <div class="hint">ถ่ายห้องเย็น หรือ Back Stock<br>
         • สินค้า<b>หมดอายุเร็ว</b> → ไว้<b>บน / ไว้หน้า</b><br>
         • สินค้า<b>หมดอายุช้า</b> → ไว้<b>ล่าง / ไว้หลัง</b></div>
@@ -332,16 +349,16 @@ function renderForm() {
       ${photoBlock('fifo', 'รูปห้องเย็น / Back Stock')}
     </div>
 
-    <div class="card">
-      <div class="q"><span>04</span>Red zone / Amber zone</div>
+    ${R.zone ? `<div class="card">
+      <div class="q"><span>${no()}</span>Red zone / Amber zone</div>
       <div class="hint bad"><b>Red zone ต้องเคลียร์ให้หมดภายในวัน</b><br>ห้ามมีสินค้าหมดอายุเหลือค้างข้ามวัน</div>
       <button class="opt ${f.redCleared ? 'sel' : ''}" id="red">${f.redCleared ? '☑️' : '⬜'} เคลียร์ Red zone หมดแล้ว</button>
       ${photoBlock('red', 'รูป Red zone')}
       ${photoBlock('amber', 'รูป Amber zone')}
-    </div>
+    </div>` : ''}
 
     <div class="card">
-      <div class="q"><span>05</span>สุ่มตรวจป้ายราคา วันละ ${PRICE_MODS} Mods</div>
+      <div class="q"><span>${no()}</span>สุ่มตรวจป้ายราคา วันละ ${PRICE_MODS} Mods</div>
       <div class="hint">สุ่ม ${PRICE_MODS} Mods ถ่ายรูปป้ายราคา Mod ละ 1 รูป แล้วตอบผลตรวจ · ถ้าเจอป้ายผิดให้แก้ก่อนส่ง</div>
       ${f.priceMods.map((m, i) => {
         const old = state.editing && (state.existing.price || 0) > i;
@@ -362,8 +379,23 @@ function renderForm() {
       }).join('')}
     </div>
 
+    ${R.countItem ? `<div class="card">
+      <div class="q"><span>${no()}</span>สุ่มนับสต็อก ${esc(R.countItem)} (บังคับ)</div>
+      <div class="hint">สุ่ม${esc(R.countItem)} 1 รายการ นับของจริงเทียบกับจำนวนในระบบ<br>ใส่หน่วยเดียวกับในระบบ (ชิ้น / แพ็ค / กก.)</div>
+      <div class="field">
+        <label>สินค้าที่สุ่มนับ</label>
+        <input id="countSku" maxlength="60" placeholder="${R.countItem === 'Salmon' ? 'เช่น แซลมอนสด ทั้งตัว' : 'เช่น วากิว A5 ริบอาย'}" value="${esc(f.countSku)}">
+      </div>
+      <div class="amt">
+        <div class="field"><label>จำนวนในระบบ</label><input id="countSys" inputmode="decimal" placeholder="0" value="${esc(f.countSys)}"></div>
+        <div class="field"><label>นับได้จริง</label><input id="countAct" inputmode="decimal" placeholder="0" value="${esc(f.countAct)}"></div>
+      </div>
+      <div class="net muted"><span>ส่วนต่าง</span><b id="cdiff">${diff}</b></div>
+      ${photoBlock('count', 'รูปสินค้าที่นับ')}
+    </div>` : ''}
+
     <div class="card">
-      <div class="q"><span>06</span>การปรับสต็อก</div>
+      <div class="q"><span>${no()}</span>การปรับสต็อก</div>
       ${opt('stockAdjusted', false, 'ไม่มีการปรับสต็อก')}
       ${opt('stockAdjusted', true, 'มีการปรับสต็อก')}
       ${f.stockAdjusted === true ? `
@@ -382,7 +414,7 @@ function renderForm() {
         ${photoBlock('stock', 'รูปหลักฐานการปรับสต็อก')}` : ''}
     </div>
 
-    ${canSubmit || state.submitting ? '' : `<div class="alert warn" style="margin:-4px 0 12px">ยังไม่ครบ: ${missingItems().join(', ')}</div>`}
+    <div class="alert warn" id="missing" style="margin:-4px 0 12px;${canSubmit || state.submitting ? 'display:none' : ''}">ยังไม่ครบ: ${missingItems().join(', ')}</div>
     <button class="btn" id="submit" ${canSubmit ? '' : 'disabled'}>
       ${state.submitting ? 'กำลังอัปโหลดรูปและบันทึก...' : state.editing ? 'บันทึกการแก้ไข' : 'ยืนยันปิดงาน'}
     </button>
@@ -398,7 +430,19 @@ function renderForm() {
     if (g === 'stockAdjusted' && v === true) document.getElementById('minus')?.focus();
   });
   document.getElementById('fifo').onclick = () => { f.fifoDone = !f.fifoDone; renderForm(); };
-  document.getElementById('red').onclick = () => { f.redCleared = !f.redCleared; renderForm(); };
+  const redBtn = document.getElementById('red');
+  if (redBtn) redBtn.onclick = () => { f.redCleared = !f.redCleared; renderForm(); };
+  [['countSku', 'countSku'], ['countSys', 'countSys'], ['countAct', 'countAct']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.oninput = () => {
+      if (id !== 'countSku') el.value = el.value.replace(/[^\d.,]/g, '');
+      f[key] = el.value;
+      const d = document.getElementById('cdiff');
+      if (d) d.innerHTML = countDiff();
+      refreshMissing();
+    };
+  });
   view.querySelectorAll('[data-pr]').forEach(b => b.onclick = () => {
     const [i, r] = b.dataset.pr.split(':');
     f.priceMods[i].result = r;
@@ -424,7 +468,7 @@ function renderForm() {
       el.value = el.value.replace(/[^\d.,]/g, '');
       f[key] = el.value;
       document.getElementById('net').innerHTML = signed(num(f.stockPlus) - num(f.stockMinus));
-      document.getElementById('submit').disabled = !formValid();
+      refreshMissing();
     };
     el.onchange = () => renderForm();
   });
@@ -470,6 +514,18 @@ const hasPhotos = key => {
   return n >= min;
 };
 
+/** อัปเดตปุ่มยืนยันและรายการที่ยังขาด โดยไม่วาดฟอร์มใหม่ (คีย์บอร์ดไม่หุบ) */
+function refreshMissing() {
+  const ok = formValid();
+  const b = document.getElementById('submit');
+  if (b) b.disabled = !ok;
+  const box = document.getElementById('missing');
+  if (box) {
+    box.style.display = ok || state.submitting ? 'none' : '';
+    box.textContent = 'ยังไม่ครบ: ' + missingItems().join(', ');
+  }
+}
+
 function missingItems() {
   const f = state.form;
   const m = [];
@@ -479,9 +535,18 @@ function missingItems() {
   if (!hasPhotos('cold')) m.push('รูปห้องเย็น');
   if (!f.fifoDone) m.push('ติ๊ก FIFO');
   if (!hasPhotos('fifo')) m.push('รูป FIFO');
-  if (!f.redCleared) m.push('ติ๊กเคลียร์ Red zone');
-  if (!hasPhotos('red')) m.push('รูป Red zone');
-  if (!hasPhotos('amber')) m.push('รูป Amber zone');
+  const R = rules();
+  if (R.zone) {
+    if (!f.redCleared) m.push('ติ๊กเคลียร์ Red zone');
+    if (!hasPhotos('red')) m.push('รูป Red zone');
+    if (!hasPhotos('amber')) m.push('รูป Amber zone');
+  }
+  if (R.countItem) {
+    if (!f.countSku.trim()) m.push(`ชื่อ${R.countItem}ที่สุ่มนับ`);
+    if (!isQty(f.countSys)) m.push('จำนวนในระบบ');
+    if (!isQty(f.countAct)) m.push('จำนวนนับจริง');
+    if (!hasPhotos('count')) m.push('รูปสินค้าที่นับ');
+  }
   f.priceMods.forEach((x, i) => {
     const hasPic = x.photo || (state.editing && (state.existing.price || 0) > i);
     if (!hasPic) m.push(`รูปป้ายราคา Mod ${i + 1}`);
@@ -549,7 +614,8 @@ async function submit() {
       coldStatus: f.coldStatus,
       coldNote: f.coldStatus === 'issue' ? f.coldNote : '',
       fifoDone: f.fifoDone,
-      redCleared: f.redCleared,
+      redCleared: rules().zone ? f.redCleared : false,
+      countSku: f.countSku.trim(), countSys: f.countSys, countAct: f.countAct,
       priceMods: f.priceMods.map(x => ({ result: x.result })),
       pricePhotoSlots: f.priceMods.map(x => x.photo || ''),
       stockAdjusted: f.stockAdjusted,
@@ -559,7 +625,8 @@ async function submit() {
       // ส่งเฉพาะรูปใหม่ หัวข้อที่ไม่มีรูปใหม่ ระบบจะใช้รูปเดิม (ตอนแก้ไข)
       photoGroups: {
         expiry: f.photos.expiry, cold: f.photos.cold, fifo: f.photos.fifo,
-        red: f.photos.red, amber: f.photos.amber,
+        red: rules().zone ? f.photos.red : [], amber: rules().zone ? f.photos.amber : [],
+        count: rules().countItem ? f.photos.count : [],
         stock: f.stockAdjusted ? f.photos.stock : [],
       },
     });
@@ -598,14 +665,18 @@ function groupMessage(data) {
   lines.push(`🗓 หมดอายุหน้าร้าน: ${expIssue ? '⚠️ พบปัญหา' + (c.note ? ' – ' + c.note : '') : 'ไม่พบปัญหา'}${cnt(c.expiryPhotoCount)}`);
   lines.push(`❄️ ห้องเย็น: ${coldIssue ? '⚠️ พบปัญหา' + (c.coldNote ? ' – ' + c.coldNote : '') : 'ไม่พบปัญหา'}${cnt(c.coldPhotoCount)}`);
   lines.push(`🔄 FIFO: ${c.fifoDone ? 'ทำแล้ว' : '-'}${cnt(c.fifoPhotoCount)}`);
-  lines.push(`🟥 Red zone: ${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}${cnt(c.redPhotoCount)} · 🟧 Amber zone${cnt(c.amberPhotoCount)}`);
+  if (c.redCleared || c.redPhotoCount) lines.push(`🟥 Red zone: ${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}${cnt(c.redPhotoCount)} · 🟧 Amber zone${cnt(c.amberPhotoCount)}`);
   lines.push(`🏷 ป้ายราคา: ${priceText(c.priceMods)}${cnt(c.pricePhotoCount)}`);
+  if (c.countItem && c.countSys != null) lines.push(`🔢 นับ${c.countItem}: ${c.countSku} · ระบบ ${c.countSys} / นับ ${c.countAct} ${diffText(c.countSys, c.countAct)}${cnt(c.countPhotoCount)}`);
   const stock = [];
   if (c.stockPlus) stock.push(`+฿${plain(c.stockPlus)}`);
   if (c.stockMinus) stock.push(`−฿${plain(c.stockMinus)}`);
   lines.push(`📦 ปรับสต็อก: ${stock.length ? stock.join(' / ') : 'ไม่มี'}${cnt(c.photoCount)}`);
   const nImg = (data.groupPhotos || []).length;
-  if (nImg) lines.push(`📷 รูปหลักฐาน ${nImg} รูป ตามด้านล่าง (หมดอายุ → ห้องเย็น → FIFO → Red → Amber → ป้ายราคา → ปรับสต็อก)`);
+  const order = [['หมดอายุ', c.expiryPhotoCount], ['ห้องเย็น', c.coldPhotoCount], ['FIFO', c.fifoPhotoCount],
+    ['Red', c.redPhotoCount], ['Amber', c.amberPhotoCount], ['ป้ายราคา', c.pricePhotoCount],
+    ['นับสต็อก', c.countPhotoCount], ['ปรับสต็อก', c.photoCount]].filter(x => x[1]).map(x => x[0]);
+  if (nImg) lines.push(`📷 รูปหลักฐาน ${nImg} รูป ตามด้านล่าง (${order.join(' → ')})`);
   lines.push('━━━━━━━━━━');
   if (!p.pending.length) {
     lines.push(`🎉 ปิดครบ ${p.doneCount}/${p.totalDepartments} แผนกแล้ว`);
@@ -708,8 +779,10 @@ function renderDone() {
         <div class="row"><span>ห้องเย็น</span><b>${esc(c.coldStatus || '-')}${c.coldPhotoCount ? ' · 📷' + c.coldPhotoCount : ''}</b></div>
         ${c.coldNote ? `<div class="row"><span>ห้องเย็น: รายละเอียด</span><b>${esc(c.coldNote)}</b></div>` : ''}
         <div class="row"><span>FIFO</span><b>${c.fifoDone ? 'ทำแล้ว' : '-'}${c.fifoPhotoCount ? ' · 📷' + c.fifoPhotoCount : ''}</b></div>
+        ${c.redCleared || c.redPhotoCount ? `
         <div class="row"><span>Red zone</span><b>${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}${c.redPhotoCount ? ' · 📷' + c.redPhotoCount : ''}</b></div>
-        <div class="row"><span>Amber zone</span><b>${c.amberPhotoCount ? '📷 ' + c.amberPhotoCount + ' รูป' : '-'}</b></div>
+        <div class="row"><span>Amber zone</span><b>${c.amberPhotoCount ? '📷 ' + c.amberPhotoCount + ' รูป' : '-'}</b></div>` : ''}
+        ${c.countItem && c.countSys != null ? `<div class="row"><span>นับ${esc(c.countItem)}: ${esc(c.countSku)}</span><b>ระบบ ${c.countSys} / นับ ${c.countAct} · ${diffText(c.countSys, c.countAct)}${c.countPhotoCount ? ' · 📷' + c.countPhotoCount : ''}</b></div>` : ''}
         <div class="row"><span>ป้ายราคา</span><b>${esc(priceText(c.priceMods))}${c.pricePhotoCount ? ' · 📷' + c.pricePhotoCount : ''}</b></div>
         ${c.stockPlus || c.stockMinus ? `
         <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
@@ -737,6 +810,9 @@ function renderDone() {
       coldNote: c.coldNote || '',
       fifoDone: !!c.fifoDone,
       redCleared: !!c.redCleared,
+      countSku: c.countSku || '',
+      countSys: c.countSys != null ? String(c.countSys) : '',
+      countAct: c.countAct != null ? String(c.countAct) : '',
       priceMods: emptyForm().priceMods.map((x, i) => ({ result: (c.priceMods && c.priceMods[i] && c.priceMods[i].result) || '', photo: '' })),
       stockAdjusted: c.stockPlus > 0 || c.stockMinus > 0,
       stockPlus: c.stockPlus > 0 ? String(c.stockPlus) : '',
@@ -744,7 +820,8 @@ function renderDone() {
       note: c.note || '',
     });
     state.existing = { expiry: c.expiryPhotoCount || 0, cold: c.coldPhotoCount || 0, fifo: c.fifoPhotoCount || 0,
-      red: c.redPhotoCount || 0, amber: c.amberPhotoCount || 0, price: c.pricePhotoCount || 0, stock: c.photoCount || 0 };
+      red: c.redPhotoCount || 0, amber: c.amberPhotoCount || 0, price: c.pricePhotoCount || 0,
+      count: c.countPhotoCount || 0, stock: c.photoCount || 0 };
     state.editing = true;
     renderForm();
   };
@@ -872,7 +949,8 @@ async function renderDetail() {
           <div class="row"><span>ห้องเย็น</span><b>${esc(c.coldStatus || '-')}</b></div>
           ${c.coldNote ? `<div class="row"><span>ห้องเย็น: รายละเอียด</span><b>${esc(c.coldNote)}</b></div>` : ''}
           <div class="row"><span>FIFO</span><b>${c.fifoDone ? 'ทำแล้ว' : '-'}</b></div>
-          <div class="row"><span>Red zone</span><b>${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}</b></div>
+          ${c.redCleared ? `<div class="row"><span>Red zone</span><b>เคลียร์หมดแล้ว</b></div>` : ''}
+          ${c.countItem && c.countSys != null ? `<div class="row"><span>นับ${esc(c.countItem)}: ${esc(c.countSku)}</span><b>ระบบ ${c.countSys} / นับ ${c.countAct} · ${diffText(c.countSys, c.countAct)}</b></div>` : ''}
           <div class="row"><span>ป้ายราคา</span><b>${esc(priceText(c.priceMods))}</b></div>
           <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
           <div class="row"><span>ปรับลด (−)</span><b class="neg">−฿${baht(c.stockMinus)}</b></div>
