@@ -145,6 +145,8 @@
   .zoom { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; align-items: center; justify-content: center;
     z-index: 10; padding: 16px; }
   .zoom img { max-width: 100%; max-height: 100%; border-radius: 6px; }
+  .hint { font-size: 14px; background: #f3f4f6; border-radius: 10px; padding: 10px 12px; margin: -2px 0 10px; line-height: 1.55; }
+  .hint.bad { background: var(--red-soft); color: var(--red); }
   .chip { font: inherit; font-size: 14px; border: 1.5px solid var(--line); background: #fff; color: var(--ink);
     border-radius: 10px; padding: 7px 12px; }
 </style>
@@ -152,7 +154,7 @@
 <body>
 <header>
   <div class="title">Fresh Daily Closing</div>
-  <div class="sub" id="hdr-sub">ตรวจวันหมดอายุ · ห้องเย็น · FIFO · ปรับสต็อก</div>
+  <div class="sub" id="hdr-sub">หมดอายุ · ห้องเย็น · FIFO · Red/Amber zone · ปรับสต็อก</div>
 </header>
 <nav id="tabs">
   <button data-tab="close" class="active">ปิดงานแผนก</button>
@@ -182,11 +184,11 @@ const state = {
   detail: null,        // { date, department } เมื่อเปิดหน้ารายละเอียด
 };
 const MAX_PHOTOS = 3;
-const PHOTO_KEYS = ['expiry', 'cold', 'fifo', 'stock'];
+const PHOTO_KEYS = ['expiry', 'cold', 'fifo', 'red', 'amber', 'stock'];
 function emptyForm() {
-  return { expiryStatus: '', note: '', coldStatus: '', coldNote: '', fifoDone: false,
+  return { expiryStatus: '', note: '', coldStatus: '', coldNote: '', fifoDone: false, redCleared: false,
     stockAdjusted: null, stockPlus: '', stockMinus: '',
-    photos: { expiry: [], cold: [], fifo: [], stock: [] } };
+    photos: { expiry: [], cold: [], fifo: [], red: [], amber: [], stock: [] } };
 }
 const ISSUE_LABEL = 'ตรวจแล้ว พบสินค้ามีปัญหา';
 
@@ -313,12 +315,23 @@ function renderForm() {
 
     <div class="card">
       <div class="q"><span>03</span>FIFO (ของเข้าก่อน ออกก่อน)</div>
+      <div class="hint">ถ่ายห้องเย็น หรือ Back Stock<br>
+        • สินค้า<b>หมดอายุเร็ว</b> → ไว้<b>บน / ไว้หน้า</b><br>
+        • สินค้า<b>หมดอายุช้า</b> → ไว้<b>ล่าง / ไว้หลัง</b></div>
       <button class="opt ${f.fifoDone ? 'sel' : ''}" id="fifo">${f.fifoDone ? '☑️' : '⬜'} ทำ FIFO แล้ว</button>
-      ${photoBlock('fifo', 'รูปการจัด FIFO')}
+      ${photoBlock('fifo', 'รูปห้องเย็น / Back Stock')}
     </div>
 
     <div class="card">
-      <div class="q"><span>04</span>การปรับสต็อก</div>
+      <div class="q"><span>04</span>Red zone / Amber zone</div>
+      <div class="hint bad"><b>Red zone ต้องเคลียร์ให้หมดภายในวัน</b><br>ห้ามมีสินค้าหมดอายุเหลือค้างข้ามวัน</div>
+      <button class="opt ${f.redCleared ? 'sel' : ''}" id="red">${f.redCleared ? '☑️' : '⬜'} เคลียร์ Red zone หมดแล้ว</button>
+      ${photoBlock('red', 'รูป Red zone')}
+      ${photoBlock('amber', 'รูป Amber zone')}
+    </div>
+
+    <div class="card">
+      <div class="q"><span>05</span>การปรับสต็อก</div>
       ${opt('stockAdjusted', false, 'ไม่มีการปรับสต็อก')}
       ${opt('stockAdjusted', true, 'มีการปรับสต็อก')}
       ${f.stockAdjusted === true ? `
@@ -353,6 +366,7 @@ function renderForm() {
     if (g === 'stockAdjusted' && v === true) document.getElementById('minus')?.focus();
   });
   document.getElementById('fifo').onclick = () => { f.fifoDone = !f.fifoDone; renderForm(); };
+  document.getElementById('red').onclick = () => { f.redCleared = !f.redCleared; renderForm(); };
 
   ['plus', 'minus'].forEach(id => {
     const el = document.getElementById(id);
@@ -413,6 +427,9 @@ function missingItems() {
   if (!hasPhotos('cold')) m.push('รูปห้องเย็น');
   if (!f.fifoDone) m.push('ติ๊ก FIFO');
   if (!hasPhotos('fifo')) m.push('รูป FIFO');
+  if (!f.redCleared) m.push('ติ๊กเคลียร์ Red zone');
+  if (!hasPhotos('red')) m.push('รูป Red zone');
+  if (!hasPhotos('amber')) m.push('รูป Amber zone');
   if (f.stockAdjusted === null) m.push('สถานะปรับสต็อก');
   if (f.stockAdjusted) {
     if (num(f.stockPlus) + num(f.stockMinus) <= 0) m.push('ยอดปรับสต็อก');
@@ -475,6 +492,7 @@ async function submit() {
       coldStatus: f.coldStatus,
       coldNote: f.coldStatus === 'issue' ? f.coldNote : '',
       fifoDone: f.fifoDone,
+      redCleared: f.redCleared,
       stockAdjusted: f.stockAdjusted,
       stockPlus: f.stockAdjusted ? f.stockPlus : '',
       stockMinus: f.stockAdjusted ? f.stockMinus : '',
@@ -482,6 +500,7 @@ async function submit() {
       // ส่งเฉพาะรูปใหม่ หัวข้อที่ไม่มีรูปใหม่ ระบบจะใช้รูปเดิม (ตอนแก้ไข)
       photoGroups: {
         expiry: f.photos.expiry, cold: f.photos.cold, fifo: f.photos.fifo,
+        red: f.photos.red, amber: f.photos.amber,
         stock: f.stockAdjusted ? f.photos.stock : [],
       },
     });
@@ -515,12 +534,13 @@ function groupMessage(data) {
   lines.push(`🗓 หมดอายุหน้าร้าน: ${expIssue ? '⚠️ พบปัญหา' + (c.note ? ' – ' + c.note : '') : 'ไม่พบปัญหา'}${cnt(c.expiryPhotoCount)}`);
   lines.push(`❄️ ห้องเย็น: ${coldIssue ? '⚠️ พบปัญหา' + (c.coldNote ? ' – ' + c.coldNote : '') : 'ไม่พบปัญหา'}${cnt(c.coldPhotoCount)}`);
   lines.push(`🔄 FIFO: ${c.fifoDone ? 'ทำแล้ว' : '-'}${cnt(c.fifoPhotoCount)}`);
+  lines.push(`🟥 Red zone: ${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}${cnt(c.redPhotoCount)} · 🟧 Amber zone${cnt(c.amberPhotoCount)}`);
   const stock = [];
   if (c.stockPlus) stock.push(`+฿${plain(c.stockPlus)}`);
   if (c.stockMinus) stock.push(`−฿${plain(c.stockMinus)}`);
   lines.push(`📦 ปรับสต็อก: ${stock.length ? stock.join(' / ') : 'ไม่มี'}${cnt(c.photoCount)}`);
   const nImg = (data.groupPhotos || []).length;
-  if (nImg) lines.push(`📷 รูปหลักฐาน ${nImg} รูป ตามด้านล่าง (หมดอายุ → ห้องเย็น → FIFO → ปรับสต็อก)`);
+  if (nImg) lines.push(`📷 รูปหลักฐาน ${nImg} รูป ตามด้านล่าง (หมดอายุ → ห้องเย็น → FIFO → Red → Amber → ปรับสต็อก)`);
   lines.push('━━━━━━━━━━');
   if (!p.pending.length) {
     lines.push(`🎉 ปิดครบ ${p.doneCount}/${p.totalDepartments} แผนกแล้ว`);
@@ -623,6 +643,8 @@ function renderDone() {
         <div class="row"><span>ห้องเย็น</span><b>${esc(c.coldStatus || '-')}${c.coldPhotoCount ? ' · 📷' + c.coldPhotoCount : ''}</b></div>
         ${c.coldNote ? `<div class="row"><span>ห้องเย็น: รายละเอียด</span><b>${esc(c.coldNote)}</b></div>` : ''}
         <div class="row"><span>FIFO</span><b>${c.fifoDone ? 'ทำแล้ว' : '-'}${c.fifoPhotoCount ? ' · 📷' + c.fifoPhotoCount : ''}</b></div>
+        <div class="row"><span>Red zone</span><b>${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}${c.redPhotoCount ? ' · 📷' + c.redPhotoCount : ''}</b></div>
+        <div class="row"><span>Amber zone</span><b>${c.amberPhotoCount ? '📷 ' + c.amberPhotoCount + ' รูป' : '-'}</b></div>
         ${c.stockPlus || c.stockMinus ? `
         <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
         <div class="row"><span>ปรับลด (−)</span><b class="neg">−฿${baht(c.stockMinus)}</b></div>
@@ -648,12 +670,14 @@ function renderDone() {
       coldStatus: !c.coldStatus ? '' : c.coldStatus === ISSUE_LABEL ? 'issue' : 'ok',
       coldNote: c.coldNote || '',
       fifoDone: !!c.fifoDone,
+      redCleared: !!c.redCleared,
       stockAdjusted: c.stockPlus > 0 || c.stockMinus > 0,
       stockPlus: c.stockPlus > 0 ? String(c.stockPlus) : '',
       stockMinus: c.stockMinus > 0 ? String(c.stockMinus) : '',
       note: c.note || '',
     });
-    state.existing = { expiry: c.expiryPhotoCount || 0, cold: c.coldPhotoCount || 0, fifo: c.fifoPhotoCount || 0, stock: c.photoCount || 0 };
+    state.existing = { expiry: c.expiryPhotoCount || 0, cold: c.coldPhotoCount || 0, fifo: c.fifoPhotoCount || 0,
+      red: c.redPhotoCount || 0, amber: c.amberPhotoCount || 0, stock: c.photoCount || 0 };
     state.editing = true;
     renderForm();
   };
@@ -781,6 +805,7 @@ async function renderDetail() {
           <div class="row"><span>ห้องเย็น</span><b>${esc(c.coldStatus || '-')}</b></div>
           ${c.coldNote ? `<div class="row"><span>ห้องเย็น: รายละเอียด</span><b>${esc(c.coldNote)}</b></div>` : ''}
           <div class="row"><span>FIFO</span><b>${c.fifoDone ? 'ทำแล้ว' : '-'}</b></div>
+          <div class="row"><span>Red zone</span><b>${c.redCleared ? 'เคลียร์หมดแล้ว' : '-'}</b></div>
           <div class="row"><span>ปรับเพิ่ม (+)</span><b class="pos">+฿${baht(c.stockPlus)}</b></div>
           <div class="row"><span>ปรับลด (−)</span><b class="neg">−฿${baht(c.stockMinus)}</b></div>
           <div class="row"><span>ยอดสุทธิ</span><b>${signed(c.stockNet)}</b></div>
@@ -802,7 +827,7 @@ async function renderDetail() {
             <div class="it ${h.action === 'edit' ? 'edit' : ''}">
               <b>${esc(h.time)} น. · ${h.action === 'edit' ? 'แก้ไข' : 'ปิดงาน'}</b> <span class="muted">โดย ${esc(h.name)}</span>
               <div class="muted">หมดอายุ: ${esc(h.expiryStatus)}${h.note ? ' · ' + esc(h.note) : ''}</div>
-              ${h.coldStatus ? `<div class="muted">ห้องเย็น: ${esc(h.coldStatus)}${h.fifoDone ? ' · FIFO ทำแล้ว' : ''}</div>` : ''}
+              ${h.coldStatus ? `<div class="muted">ห้องเย็น: ${esc(h.coldStatus)}${h.fifoDone ? ' · FIFO ทำแล้ว' : ''}${h.redCleared ? ' · Red zone เคลียร์แล้ว' : ''}</div>` : ''}
               <div class="muted">${stockText(h)}${h.photoCount ? ' · 📷' + h.photoCount : ''}</div>
             </div>`).join('')}
         </div>
@@ -832,7 +857,7 @@ async function renderDetail() {
     }
     if (state.me.registered) {
       document.getElementById('hdr-sub').textContent =
-        state.me.role === 'manager' ? 'ภาพรวมสำหรับผู้จัดการ' : 'ตรวจวันหมดอายุ · ห้องเย็น · FIFO · ปรับสต็อก';
+        state.me.role === 'manager' ? 'ภาพรวมสำหรับผู้จัดการ' : 'หมดอายุ · ห้องเย็น · FIFO · Red/Amber zone · ปรับสต็อก';
     }
     render();
   } catch (e) {
