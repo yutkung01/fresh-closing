@@ -146,12 +146,11 @@
     z-index: 10; padding: 16px; }
   .zoom img { max-width: 100%; max-height: 100%; border-radius: 6px; }
   .hint { font-size: 14px; background: #f3f4f6; border-radius: 10px; padding: 10px 12px; margin: -2px 0 10px; line-height: 1.55; }
-  .pmod { border-top: 1px dashed var(--line); padding: 10px 0; }
+  .pmod { display: grid; grid-template-columns: 104px 1fr; gap: 12px; align-items: center; border-top: 1px dashed var(--line); padding: 10px 0; }
   .pmod:first-of-type { border-top: 0; padding-top: 0; }
-  .pmod-in { width: 100%; font: inherit; border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
-  .pmod-in:focus { outline: none; border-color: var(--green); }
-  .pmod-r { display: flex; gap: 8px; }
-  .pmod-r .chip { flex: 1; }
+  .pmod-box .addph span { text-align: center; padding: 0 4px; }
+  .pmod-h { font-weight: 700; }
+  .pmod-r { display: grid; gap: 6px; }
   .chip.on { border-color: var(--green); background: var(--green-soft); font-weight: 600; }
   .chip.on.warn { border-color: var(--amber); background: var(--amber-soft); }
   .hint.bad { background: var(--red-soft); color: var(--red); }
@@ -181,7 +180,7 @@ const CONFIG = {
 const view = document.getElementById('view');
 const tabs = document.getElementById('tabs');
 const PRICE_MODS = 3;
-const MIN_PHOTOS = { price: PRICE_MODS };
+const MIN_PHOTOS = {};
 const state = {
   me: null,
   tab: 'close',
@@ -197,7 +196,7 @@ const MAX_PHOTOS = 3;
 const PHOTO_KEYS = ['expiry', 'cold', 'fifo', 'red', 'amber', 'price', 'stock'];
 function emptyForm() {
   return { expiryStatus: '', note: '', coldStatus: '', coldNote: '', fifoDone: false, redCleared: false,
-    priceMods: Array.from({ length: PRICE_MODS }, () => ({ mod: '', result: '' })),
+    priceMods: Array.from({ length: PRICE_MODS }, () => ({ result: '', photo: '' })),
     stockAdjusted: null, stockPlus: '', stockMinus: '',
     photos: { expiry: [], cold: [], fifo: [], red: [], amber: [], price: [], stock: [] } };
 }
@@ -343,16 +342,24 @@ function renderForm() {
 
     <div class="card">
       <div class="q"><span>05</span>สุ่มตรวจป้ายราคา วันละ ${PRICE_MODS} Mods</div>
-      <div class="hint">เลือกสุ่ม ${PRICE_MODS} Mods ตรวจว่าป้ายราคาครบและตรงกับสินค้า ถ้าเจอป้ายผิดให้แก้ก่อนส่ง · ถ่าย 1 รูปต่อ Mod</div>
-      ${f.priceMods.map((m, i) => `
+      <div class="hint">สุ่ม ${PRICE_MODS} Mods ถ่ายรูปป้ายราคา Mod ละ 1 รูป แล้วตอบผลตรวจ · ถ้าเจอป้ายผิดให้แก้ก่อนส่ง</div>
+      ${f.priceMods.map((m, i) => {
+        const old = state.editing && (state.existing.price || 0) > i;
+        const busy = state.preparing === 'price' + i;
+        return `
         <div class="pmod">
-          <input class="pmod-in" data-mod="${i}" maxlength="30" placeholder="Mod ที่ ${i + 1} เช่น A12" value="${esc(m.mod)}">
+          <div class="pmod-box">
+            ${m.photo ? `<div class="ph"><img src="${m.photo}" alt="รูปป้ายราคา Mod ${i + 1}"><button class="rm" data-prm="${i}" aria-label="ลบรูป">✕</button></div>`
+              : `<label class="addph">${busy ? '<div class="spinner" style="margin:0;width:22px;height:22px"></div>' : old ? '🖼<span>รูปเดิม · แตะเพื่อเปลี่ยน</span>' : '＋<span>ถ่ายรูป</span>'}
+                  <input type="file" accept="image/*" data-pslot="${i}" hidden ${state.preparing ? 'disabled' : ''}></label>`}
+          </div>
           <div class="pmod-r">
+            <div class="pmod-h">Mod ${i + 1}</div>
             <button class="chip ${m.result === 'ok' ? 'on' : ''}" data-pr="${i}:ok">✅ ถูกต้อง</button>
             <button class="chip ${m.result === 'fixed' ? 'on warn' : ''}" data-pr="${i}:fixed">⚠️ ผิด แก้แล้ว</button>
           </div>
-        </div>`).join('')}
-      ${photoBlock('price', 'รูปป้ายราคา')}
+        </div>`;
+      }).join('')}
     </div>
 
     <div class="card">
@@ -397,10 +404,17 @@ function renderForm() {
     f.priceMods[i].result = r;
     renderForm();
   });
-  view.querySelectorAll('[data-mod]').forEach(el => {
-    el.oninput = () => { f.priceMods[el.dataset.mod].mod = el.value; };
-    el.onchange = () => renderForm();
+  view.querySelectorAll('input[data-pslot]').forEach(inp => inp.onchange = async () => {
+    const i = Number(inp.dataset.pslot);
+    const file = inp.files[0];
+    if (!file) return;
+    state.preparing = 'price' + i;
+    renderForm();
+    try { f.priceMods[i].photo = await compressImage(file); }
+    catch (e) { alert(e.message); }
+    finally { state.preparing = ''; renderForm(); }
   });
+  view.querySelectorAll('[data-prm]').forEach(b => b.onclick = () => { f.priceMods[b.dataset.prm].photo = ''; renderForm(); });
 
   ['plus', 'minus'].forEach(id => {
     const el = document.getElementById(id);
@@ -469,10 +483,10 @@ function missingItems() {
   if (!hasPhotos('red')) m.push('รูป Red zone');
   if (!hasPhotos('amber')) m.push('รูป Amber zone');
   f.priceMods.forEach((x, i) => {
-    if (!x.mod.trim()) m.push(`ชื่อ Mod ที่ ${i + 1}`);
-    else if (!x.result) m.push(`ผลตรวจป้าย ${x.mod.trim()}`);
+    const hasPic = x.photo || (state.editing && (state.existing.price || 0) > i);
+    if (!hasPic) m.push(`รูปป้ายราคา Mod ${i + 1}`);
+    if (!x.result) m.push(`ผลตรวจป้าย Mod ${i + 1}`);
   });
-  if (!hasPhotos('price')) m.push(`รูปป้ายราคา ${PRICE_MODS} รูป`);
   if (f.stockAdjusted === null) m.push('สถานะปรับสต็อก');
   if (f.stockAdjusted) {
     if (num(f.stockPlus) + num(f.stockMinus) <= 0) m.push('ยอดปรับสต็อก');
@@ -536,7 +550,8 @@ async function submit() {
       coldNote: f.coldStatus === 'issue' ? f.coldNote : '',
       fifoDone: f.fifoDone,
       redCleared: f.redCleared,
-      priceMods: f.priceMods.map(x => ({ mod: x.mod.trim(), result: x.result })),
+      priceMods: f.priceMods.map(x => ({ result: x.result })),
+      pricePhotoSlots: f.priceMods.map(x => x.photo || ''),
       stockAdjusted: f.stockAdjusted,
       stockPlus: f.stockAdjusted ? f.stockPlus : '',
       stockMinus: f.stockAdjusted ? f.stockMinus : '',
@@ -544,7 +559,7 @@ async function submit() {
       // ส่งเฉพาะรูปใหม่ หัวข้อที่ไม่มีรูปใหม่ ระบบจะใช้รูปเดิม (ตอนแก้ไข)
       photoGroups: {
         expiry: f.photos.expiry, cold: f.photos.cold, fifo: f.photos.fifo,
-        red: f.photos.red, amber: f.photos.amber, price: f.photos.price,
+        red: f.photos.red, amber: f.photos.amber,
         stock: f.stockAdjusted ? f.photos.stock : [],
       },
     });
@@ -722,7 +737,7 @@ function renderDone() {
       coldNote: c.coldNote || '',
       fifoDone: !!c.fifoDone,
       redCleared: !!c.redCleared,
-      priceMods: (c.priceMods && c.priceMods.length ? c.priceMods : emptyForm().priceMods).map(x => ({ mod: x.mod, result: x.result })),
+      priceMods: emptyForm().priceMods.map((x, i) => ({ result: (c.priceMods && c.priceMods[i] && c.priceMods[i].result) || '', photo: '' })),
       stockAdjusted: c.stockPlus > 0 || c.stockMinus > 0,
       stockPlus: c.stockPlus > 0 ? String(c.stockPlus) : '',
       stockMinus: c.stockMinus > 0 ? String(c.stockMinus) : '',
